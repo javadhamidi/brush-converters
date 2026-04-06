@@ -3,7 +3,7 @@
 
 ---
 
-# Deep technical anatomy of Procreate and CSP brush formats
+# Deep Technical Anatomy of Procreate and CSP Brush Formats: Building a Cross-Format Converter
 
 **No Procreate-to-CSP brush converter exists today, but building one is feasible.** The Procreate `.brush` format is a ZIP archive containing an NSKeyedArchive binary plist and PNG textures — well-understood thanks to multiple open-source parsers. The Clip Studio Paint `.sut` format is a SQLite database with brush parameters in a `Variant` table and tip images packed as TAR archives inside BLOBs — partially reverse-engineered but with critical gaps in the binary "Effector" encoding for pressure curves. Roughly **60% of brush parameters map directly** between the two formats, **25% require approximation**, and **15% have no equivalent**. The one existing converter (CSP2PC) works only in the reverse direction — CSP to Procreate — and the main blocker for the Procreate-to-CSP direction is constructing valid `.sut` files with correct Effector binary data.
 
@@ -235,8 +235,6 @@ def load_procreate_brush(path):
 
 ### Step 2: Decoding the NSKeyedArchive
 
-Python 3.8+ `plistlib` natively handles UID tokens in binary plists but does **not** automatically resolve the NSKeyedArchive object graph. Manual recursive resolution is required:
-
 ```python
 def resolve_nska(plist):
     objects = plist['$objects']
@@ -254,7 +252,6 @@ def resolve_nska(plist):
         if isinstance(val, dict):
             if '$classname' in val: return val['$classname']
             r = {k: resolve(v, depth+1) for k, v in val.items() if k != '$class'}
-            # Convert NS collection types to Python natives
             if 'NS.objects' in r and 'NS.keys' in r:
                 return dict(zip(r['NS.keys'], r['NS.objects']))
             if 'NS.objects' in r: return r['NS.objects']
@@ -265,17 +262,6 @@ def resolve_nska(plist):
     
     return resolve(root_uid)
 ```
-
-Four Python libraries offer progressively higher-level abstractions:
-
-| Library | Install | Best for | Can write archives? |
-|---|---|---|---|
-| `plistlib` | stdlib | Low-level control, zero dependencies | Yes (manual) |
-| `ccl_bplist` | pip or manual | Lazy UID resolution, forensics use | No |
-| `bpylist2` | `pip install bpylist2` | Full class-aware archive/unarchive | **Yes** |
-| `nska_deserialize` | `pip install nska_deserialize` | Quick recursive dump to dict/JSON | No |
-
-For reading Procreate brushes, **`plistlib` (stdlib) with manual resolution** offers the best balance of control and zero dependencies. For writing NSKeyedArchive data back (needed if modifying `.brush` templates), **`bpylist2`** is the only Python option that supports `archiver.archive()`.
 
 ### Step 3: Converting textures
 
@@ -292,8 +278,6 @@ def convert_grain_for_csp(grain_bytes):
 ```
 
 ### Step 4: Constructing a .sut file
-
-This is the most challenging step due to incomplete reverse-engineering of the `Variant` table schema and Effector binary format. The recommended approach is **template-based construction**:
 
 ```python
 import sqlite3, tarfile, io
@@ -322,15 +306,9 @@ def create_sut_from_template(template_sut, output_path, name, tip_png, params):
     c.execute("UPDATE MaterialFile SET FileData = ? WHERE _PW_ID = 1",
               (tar_buffer.getvalue(),))
     
-    # Update Variant parameters (column names must match CSP's schema)
-    # This requires knowing exact column names from analyzing reference .sut files
-    # c.execute("UPDATE Variant SET SomeParam = ? WHERE VariantId = 1", (value,))
-    
     conn.commit()
     conn.close()
 ```
-
-**The critical blocker** is that creating `.sut` files from scratch requires knowing all mandatory `Variant` columns and their expected data types. The `tohsakrat/Brush-Converter` explicitly notes it can extract but cannot repack `.sut` files, blocked by the `.layer` digital asset format within BLOBs. The template-based approach — cloning an existing `.sut` and modifying specific fields — sidesteps this by preserving all structural data and only changing the brush tip image and parameter values.
 
 ### Step 5: Practical recommendations
 
@@ -344,26 +322,18 @@ For a working Procreate→CSP converter, the most viable architecture is:
 6. **Update** known `Variant` columns with converted parameter values
 7. For **pressure curves**, either use CSPBrushInfo to reverse-engineer the Effector format from known curves, or skip dynamic mapping and use CSP's default linear pressure response
 
-The template approach means you need a collection of reference `.sut` files covering different brush types (pen, pencil, airbrush, watercolor) to use as starting points. Export these from CSP using File → Export Sub Tool, then analyze their `Variant` tables with `CSPBrushExtract` or direct SQLite inspection to build your column-name mapping.
-
 ---
 
 ## Key gotchas and version-specific quirks
 
 **Endianness**: Binary plists use big-endian byte order; `plistlib` handles this transparently. SQLite uses native byte order (little-endian on most platforms). PNG is platform-independent.
 
-**Built-in textures**: Many Procreate brushes reference the app's internal Source Library via `bundledShapePath`/`bundledGrainPath` strings rather than embedding PNGs. These textures cannot be extracted from the `.brush` file — your converter must either substitute known equivalents (e.g., a simple circle for `Round.png`) or flag these brushes as requiring manual texture assignment.
+**Built-in textures**: Many Procreate brushes reference the app's internal Source Library via `bundledShapePath`/`bundledGrainPath` strings rather than embedding PNGs. These textures cannot be extracted from the `.brush` file — your converter must either substitute known equivalents or flag these brushes as requiring manual texture assignment.
 
 **Grain movement has no CSP equivalent.** Procreate's Rolling grain mode (texture follows the stroke path) and Texturized mode (stamps texture per-dab) fundamentally differ from CSP's canvas-fixed texture tiling. This affects roughly 40% of Procreate brushes and is the single most common feature loss in conversion.
 
 **Rendering mode is the hardest parameter to convert.** Procreate's six rendering modes control how overlapping stamps within a single stroke composite together. Light Glaze (the default) roughly matches CSP's standard rendering. Intense Blending and Heavy Glaze require careful combination of CSP's Color mixing mode, Amount of Paint, Density of Paint, and Color Stretch — and the results will never match perfectly because the underlying rendering engines differ fundamentally.
 
-**CSP Effector format is version-dependent.** The binary encoding for pressure curves and dynamics changes across CSP releases. Any Effector parser must either target a specific CSP version or use heuristic detection. The `VS-CSPBrushInfo` C# tool contains the most advanced publicly available Effector decoding and would be the best reference for implementing this in Python.
+**CSP Effector format is version-dependent.** The binary encoding for pressure curves and dynamics changes across CSP releases. Any Effector parser must either target a specific CSP version or use heuristic detection.
 
-**Procreate format versioning is handled gracefully.** Unrecognized keys in NSKeyedArchive are silently ignored, so brushes created with older Procreate versions generally load in newer versions and vice versa. However, Procreate 5.4's new parameters (spacing jitter, lateral/linear jitter, roundness jitter) will be absent from pre-5.4 brushes.
-
----
-
-## Conclusion
-
-Building a Procreate-to-CSP converter is achievable but requires working around two key gaps in current reverse-engineering knowledge: the complete CSP `Variant` table column schema and the binary Effector format for pressure curves. The **template-based approach** — cloning a reference `.sut` and replacing the brush tip image plus modifiable parameters — is the most practical path. Start by using `CSPBrushExtract` and direct SQLite inspection to catalog all `Variant` column names from a set of reference `.sut` exports, then build a mapping from Procreate plist keys to those columns. For pressure curves, the initial release can fall back to CSP's default linear response, with Effector binary encoding added later using `VS-CSPBrushInfo` as a decoding reference. The `CSP2PC` project's approach of using a `Seed.brush` template proves this template-injection pattern works well for the CSP→Procreate direction and is directly adaptable for the reverse.
+**Procreate format versioning is handled gracefully.** Unrecognized keys in NSKeyedArchive are silently ignored, so brushes created with older Procreate versions generally load in newer versions and vice versa.
