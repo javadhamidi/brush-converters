@@ -1,393 +1,390 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Procreate to Clip Studio Paint Brush Converter</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--void:#05060a;--deep:#090b12;--surf:#0d1019;--raised:#121620;--card:#171c28;--rule:#1e2436;--rule-hi:#2a3350;--t1:#c8cdd8;--t2:#8891a8;--t3:#565e75;--cyan:#22d3ee;--cyan-d:#22d3ee30;--green:#34d399;--green-d:#34d39930;--amber:#fbbf24;--amber-d:#fbbf2430;--rose:#fb7185;--rose-d:#fb718530;--blue:#60a5fa;--mono:'JetBrains Mono',monospace;--serif:'Source Serif 4',Georgia,serif}
-html{font-size:15px}
-body{font-family:var(--mono);background:var(--void);color:var(--t2);line-height:1.55;min-height:100vh;-webkit-font-smoothing:antialiased}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px)}
-.wrap{max-width:820px;margin:0 auto;padding:3rem 1.5rem 6rem}
-header{margin-bottom:3rem}
-.eyebrow{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
-.eyebrow::before{content:'';width:6px;height:6px;background:var(--cyan);border-radius:50%;box-shadow:0 0 8px var(--cyan)}
-h1{font-family:var(--serif);font-size:1.65rem;font-weight:600;color:var(--t1);line-height:1.3;margin-bottom:.75rem;letter-spacing:-.02em}
-h1 em{font-style:normal;color:var(--cyan)}
-.subtitle{font-size:.78rem;color:var(--t3);max-width:600px;line-height:1.7}
-.subtitle code{color:var(--t2);background:var(--surf);padding:1px 5px;border-radius:3px;font-size:.72rem}
-.drop{border:1.5px dashed var(--rule);border-radius:10px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all .25s;background:var(--deep);margin-bottom:2.5rem}
-.drop:hover,.drop.over{border-color:var(--cyan);background:var(--cyan-d)}
-.drop.loaded{border-color:var(--green);border-style:solid}
-.drop-icon{font-size:1.6rem;margin-bottom:.6rem;opacity:.5}
-.drop-title{font-size:.82rem;color:var(--t1);margin-bottom:.25rem}
-.drop-hint{font-size:.68rem;color:var(--t3)}
-.drop-file{font-size:.72rem;color:var(--cyan);margin-top:.6rem}
-input[type=file]{display:none}
-.stg{position:relative;padding:0 0 0 2rem;margin-left:.6rem;border-left:1.5px solid var(--rule)}
-.stg:last-child{border-left-color:transparent}
-.stg::before{content:'';position:absolute;left:-.45rem;top:0;width:.75rem;height:.75rem;border-radius:50%;border:1.5px solid var(--rule);background:var(--void);z-index:1;transition:all .3s}
-.stg.run::before{border-color:var(--cyan);background:var(--cyan);box-shadow:0 0 10px var(--cyan-d)}.stg.run{border-left-color:var(--cyan)}
-.stg.ok::before{border-color:var(--green);background:var(--green)}.stg.ok{border-left-color:var(--green)}
-.stg.err::before{border-color:var(--rose);background:var(--rose)}
-.stg-head{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.5rem;padding-top:.15rem}
-.stg-n{font-size:.6rem;color:var(--t3);min-width:1.2rem}
-.stg-name{font-size:.78rem;font-weight:600;color:var(--t1)}
-.stg-badge{margin-left:auto;font-size:.58rem;padding:2px 7px;border-radius:3px;letter-spacing:.04em}
-.stg-badge.wait{color:var(--t3);background:var(--surf)}
-.stg-badge.run{color:var(--cyan);background:var(--cyan-d);animation:blink 1.2s ease infinite}
-.stg-badge.ok{color:var(--green);background:var(--green-d)}
-.stg-badge.err{color:var(--rose);background:var(--rose-d)}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
-.stg-body{background:var(--surf);border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-bottom:1.2rem}
-.stg-info{padding:.85rem 1rem;font-family:var(--serif);font-size:.8rem;color:var(--t3);line-height:1.7;border-bottom:1px solid var(--rule)}
-.stg-info code{font-family:var(--mono);font-size:.68rem;color:var(--blue);background:var(--deep);padding:1px 5px;border-radius:3px}
-.stg-info strong{color:var(--t2);font-weight:500}
-.log{padding:.75rem 1rem;font-size:.68rem;line-height:1.65;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--t2)}
-.log:empty{display:none}
-.log .g{color:var(--green)}.log .c{color:var(--cyan)}.log .w{color:var(--amber)}.log .r{color:var(--rose)}.log .d{color:var(--t3)}
-.tex-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;padding:.85rem 1rem}
-.tex-card{background:var(--deep);border-radius:5px;overflow:hidden;border:1px solid var(--rule)}
-.tex-card canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated;background:repeating-conic-gradient(var(--raised) 0% 25%,var(--surf) 0% 50%) 0 0/12px 12px}
-.tex-lbl{padding:.4rem .6rem;font-size:.58rem;color:var(--t3);border-top:1px solid var(--rule)}
-.tex-lbl b{color:var(--t2);font-weight:500}
-.ptbl-wrap{max-height:300px;overflow-y:auto}
-table.ptbl{width:100%;border-collapse:collapse;font-size:.65rem}
-.ptbl th{text-align:left;padding:.4rem .6rem;color:var(--t3);border-bottom:1px solid var(--rule);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:.58rem;position:sticky;top:0;background:var(--surf);z-index:1}
-.ptbl td{padding:.3rem .6rem;border-bottom:1px solid #ffffff04}
-.ptbl td:nth-child(1){color:var(--t1)}.ptbl td:nth-child(2){color:var(--blue)}.ptbl td:nth-child(3){color:var(--cyan)}
-.ptbl td:nth-child(4) .dir{color:var(--green)}.ptbl td:nth-child(4) .apx{color:var(--amber)}.ptbl td:nth-child(4) .non{color:var(--rose)}.ptbl td:nth-child(4) .unk{color:var(--t3)}
-.ptbl tr:hover{background:#ffffff03}
-.dl{margin-top:1.5rem;padding:1.5rem;background:var(--surf);border:1px solid var(--rule);border-radius:10px;text-align:center;display:none}
-.dl.show{display:block}
-.dl-btn{font-family:var(--mono);font-size:.78rem;font-weight:600;padding:.75rem 2rem;border:none;border-radius:7px;background:var(--cyan);color:var(--void);cursor:pointer;transition:all .2s;letter-spacing:.03em}
-.dl-btn:hover{box-shadow:0 4px 24px var(--cyan-d);transform:translateY(-1px)}
-.dl-btn:disabled{opacity:.25;cursor:not-allowed;transform:none;box-shadow:none}
-.dl-note{margin-top:.6rem;font-size:.62rem;color:var(--t3)}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--deep)}::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procreate to Clip Studio Paint Brush Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--void:#05060a;--deep:#090b12;--surf:#0d1019;--raised:#121620;--card:#171c28;--rule:#1e2436;--rule-hi:#2a3350;--t1:#c8cdd8;--t2:#8891a8;--t3:#565e75;--cyan:#22d3ee;--cyan-d:#22d3ee30;--green:#34d399;--green-d:#34d39930;--amber:#fbbf24;--amber-d:#fbbf2430;--rose:#fb7185;--rose-d:#fb718530;--blue:#60a5fa;--mono:'JetBrains Mono',monospace;--serif:'Source Serif 4',Georgia,serif}
+    html{font-size:15px}
+    body{font-family:var(--mono);background:var(--void);color:var(--t2);line-height:1.55;min-height:100vh;-webkit-font-smoothing:antialiased}
+    body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px)}
+    .wrap{max-width:820px;margin:0 auto;padding:3rem 1.5rem 6rem}
+    header{margin-bottom:3rem}
+    h1{font-family:var(--serif);font-size:1.65rem;font-weight:600;color:var(--t1);line-height:1.3;margin-bottom:.75rem;letter-spacing:-.02em}
+    h1 em{font-style:normal;color:var(--cyan)}
+    .subtitle{font-size:.78rem;color:var(--t3);line-height:1.7}
+    .subtitle code{color:var(--t2);background:var(--surf);padding:1px 5px;border-radius:3px;font-size:.72rem}
+    .drop{border:1.5px dashed var(--rule);border-radius:10px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all .25s;background:var(--deep);margin-bottom:2.5rem}
+    .drop:hover,.drop.over{border-color:var(--cyan);background:var(--cyan-d)}
+    .drop.loaded{border-color:var(--green);border-style:solid}
+    .drop-icon{font-size:1.6rem;margin-bottom:.6rem;opacity:.5}
+    .drop-title{font-size:.82rem;color:var(--t1);margin-bottom:.25rem}
+    .drop-hint{font-size:.68rem;color:var(--t3)}
+    .drop-file{font-size:.72rem;color:var(--cyan);margin-top:.6rem}
+    input[type=file]{display:none}
+    .stg{position:relative;padding:0 0 0 2rem;margin-left:.6rem;border-left:1.5px solid var(--rule)}
+    .stg:last-child{border-left-color:transparent}
+    .stg::before{content:'';position:absolute;left:-.45rem;top:0;width:.75rem;height:.75rem;border-radius:50%;border:1.5px solid var(--rule);background:var(--void);z-index:1;transition:all .3s}
+    .stg.run::before{border-color:var(--cyan);background:var(--cyan);box-shadow:0 0 10px var(--cyan-d)}.stg.run{border-left-color:var(--cyan)}
+    .stg.ok::before{border-color:var(--green);background:var(--green)}.stg.ok{border-left-color:var(--green)}
+    .stg.err::before{border-color:var(--rose);background:var(--rose)}
+    .stg-head{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.5rem;padding-top:.15rem}
+    .stg-n{font-size:.6rem;color:var(--t3);min-width:1.2rem}
+    .stg-name{font-size:.78rem;font-weight:600;color:var(--t1)}
+    .stg-badge{margin-left:auto;font-size:.58rem;padding:2px 7px;border-radius:3px;letter-spacing:.04em}
+    .stg-badge.wait{color:var(--t3);background:var(--surf)}
+    .stg-badge.run{color:var(--cyan);background:var(--cyan-d);animation:blink 1.2s ease infinite}
+    .stg-badge.ok{color:var(--green);background:var(--green-d)}
+    .stg-badge.err{color:var(--rose);background:var(--rose-d)}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+    .stg-body{background:var(--surf);border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-bottom:1.2rem}
+    .stg-info{padding:.85rem 1rem;font-family:var(--serif);font-size:.8rem;color:var(--t3);line-height:1.7;border-bottom:1px solid var(--rule)}
+    .stg-info code{font-family:var(--mono);font-size:.68rem;color:var(--blue);background:var(--deep);padding:1px 5px;border-radius:3px}
+    .stg-info strong{color:var(--t2);font-weight:500}
+    .log{padding:.75rem 1rem;font-size:.68rem;line-height:1.65;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--t2)}
+    .log:empty{display:none}
+    .log .g{color:var(--green)}.log .c{color:var(--cyan)}.log .w{color:var(--amber)}.log .r{color:var(--rose)}.log .d{color:var(--t3)}
+    .tex-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;padding:.85rem 1rem}
+    .tex-card{background:var(--deep);border-radius:5px;overflow:hidden;border:1px solid var(--rule)}
+    .tex-card canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated;background:repeating-conic-gradient(var(--raised) 0% 25%,var(--surf) 0% 50%) 0 0/12px 12px}
+    .tex-lbl{padding:.4rem .6rem;font-size:.58rem;color:var(--t3);border-top:1px solid var(--rule)}
+    .tex-lbl b{color:var(--t2);font-weight:500}
+    .ptbl-wrap{max-height:300px;overflow-y:auto}
+    table.ptbl{width:100%;border-collapse:collapse;font-size:.65rem}
+    .ptbl th{text-align:left;padding:.4rem .6rem;color:var(--t3);border-bottom:1px solid var(--rule);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:.58rem;position:sticky;top:0;background:var(--surf);z-index:1}
+    .ptbl td{padding:.3rem .6rem;border-bottom:1px solid #ffffff04}
+    .ptbl td:nth-child(1){color:var(--t1)}.ptbl td:nth-child(2){color:var(--blue)}.ptbl td:nth-child(3){color:var(--cyan)}
+    .ptbl td:nth-child(4) .dir{color:var(--green)}.ptbl td:nth-child(4) .apx{color:var(--amber)}.ptbl td:nth-child(4) .non{color:var(--rose)}.ptbl td:nth-child(4) .unk{color:var(--t3)}
+    .ptbl tr:hover{background:#ffffff03}
+    .dl{margin-top:1.5rem;padding:1.5rem;background:var(--surf);border:1px solid var(--rule);border-radius:10px;text-align:center;display:none}
+    .dl.show{display:block}
+    .dl-btn{font-family:var(--mono);font-size:.78rem;font-weight:600;padding:.75rem 2rem;border:none;border-radius:7px;background:var(--cyan);color:var(--void);cursor:pointer;transition:all .2s;letter-spacing:.03em}
+    .dl-btn:hover{box-shadow:0 4px 24px var(--cyan-d);transform:translateY(-1px)}
+    .dl-btn:disabled{opacity:.25;cursor:not-allowed;transform:none;box-shadow:none}
+    .dl-note{margin-top:.6rem;font-size:.62rem;color:var(--t3)}
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--deep)}::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
+  </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <div class="eyebrow">Client-side format conversion</div>
-  <h1>Procreate <em>&rarr;</em> Clip Studio Paint<br>Brush Converter</h1>
-  <p class="subtitle">Deconstructs <code>.brush</code> files (ZIP &rarr; binary plist &rarr; NSKeyedArchive &rarr; SilicaBrush) and rebuilds them as <code>.sut</code> files (SQLite + TAR). Everything runs in your browser via JSZip, a hand-written bplist parser, and sql.js (WASM). No server.</p>
-</header>
-<div class="drop" id="drop">
-  <div class="drop-icon">&#9671;</div>
-  <div class="drop-title">Drop a .brush or .brushset file</div>
-  <div class="drop-hint">Procreate brush files are ZIP archives &mdash; we unpack them in-browser</div>
-  <div class="drop-file" id="dropFile"></div>
-  <input type="file" id="fi" accept=".brush,.brushset">
-</div>
-<div class="pipeline" id="pipe">
-<div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">ZIP Extraction</span><span class="stg-badge wait" id="b1">pending</span></div>
-<div class="stg-body"><div class="stg-info">A <code>.brush</code> file is a <strong>renamed ZIP archive</strong>. Inside: <code>Brush.archive</code> (NSKeyedArchive binary plist with all settings), <code>Shape.png</code> (brush tip stamp, white = opaque), <code>Grain.png</code> (texture overlay), and optional metadata. We use <strong>JSZip</strong> to decompress entirely in the browser.</div><div class="log" id="o1"></div></div></div>
-<div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Binary Plist Decode</span><span class="stg-badge wait" id="b2">pending</span></div>
-<div class="stg-body"><div class="stg-info"><code>Brush.archive</code> starts with magic <code>bplist00</code>. We read the <strong>32-byte trailer</strong> to locate the offset table, then decode each object by its <strong>type nibble</strong>: 0x0=singleton, 0x1=int, 0x2=float (IEEE 754 BE), 0x4=data, 0x5=ASCII, 0x6=UTF-16BE, <strong>0x8=UID</strong> (N+1 bytes), 0xA=array, 0xD=dict.</div><div class="log" id="o2"></div></div></div>
-<div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">NSKeyedArchive &rarr; SilicaBrush</span><span class="stg-badge wait" id="b3">pending</span></div>
-<div class="stg-body"><div class="stg-info">The plist is an <strong>NSKeyedArchive</strong>. <code>$top.root</code> points via UID into a flat <code>$objects</code> array. We recursively resolve UIDs, unwrap <code>NSDictionary</code> / <code>NSArray</code> / <code>NSData</code> to recover the full <strong>SilicaBrush</strong> parameter dictionary (80+ keys across 14 Brush Studio panels).</div><div class="log" id="o3"></div></div></div>
-<div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Texture Extraction &amp; Inversion</span><span class="stg-badge wait" id="b4">pending</span></div>
-<div class="stg-body"><div class="stg-info">Procreate: <strong>white = opaque</strong>. CSP: <strong>dark = opaque</strong>. We draw each texture to an offscreen canvas, apply per-pixel <code>255 - value</code> inversion, then export as PNG for the .sut MaterialFile BLOB.</div>
-<div class="tex-row" id="texRow">
-  <div class="tex-card"><canvas id="cv_so" width="200" height="200"></canvas><div class="tex-lbl"><b>Shape</b> original</div></div>
-  <div class="tex-card"><canvas id="cv_si" width="200" height="200"></canvas><div class="tex-lbl"><b>Shape</b> inverted (CSP)</div></div>
-  <div class="tex-card"><canvas id="cv_go" width="200" height="200"></canvas><div class="tex-lbl"><b>Grain</b> original</div></div>
-  <div class="tex-card"><canvas id="cv_gi" width="200" height="200"></canvas><div class="tex-lbl"><b>Grain</b> inverted (CSP)</div></div>
-</div><div class="log" id="o4"></div></div></div>
-<div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">Parameter Mapping</span><span class="stg-badge wait" id="b5">pending</span></div>
-<div class="stg-body"><div class="stg-info">Maps ~80 Procreate keys to CSP equivalents: <strong style="color:var(--green)">Direct</strong> (~60%), <strong style="color:var(--amber)">Approximate</strong> (~25%), <strong style="color:var(--rose)">No equivalent</strong> (~15%). Handles <strong>both old-style</strong> (pre-5.0: <code>plotSpacing</code>, <code>dynamicsPressureSize</code>) <strong>and new-style</strong> (5.0+: <code>spacing</code>, <code>pressureSize</code>) Procreate keys. Pressure curves use CSP linear default.</div>
-<div class="ptbl-wrap"><table class="ptbl"><thead><tr><th>Procreate Key</th><th>Raw Value</th><th>CSP Mapping</th><th>Fidelity</th></tr></thead><tbody id="ptbody"></tbody></table></div>
-<div class="log" id="o5"></div></div></div>
-<div class="stg" id="s6"><div class="stg-head"><span class="stg-n">06</span><span class="stg-name">SQLite .sut Construction</span><span class="stg-badge wait" id="b6">pending</span></div>
-<div class="stg-body"><div class="stg-info">A CSP <code>.sut</code> is a <strong>SQLite 3 database</strong>: <code>Node</code> (identity), <code>Variant</code> (all params as typed columns), <code>MaterialFile</code> (brush tip as <strong>TAR archive</strong> BLOB at <code>thumbnail/thumbnail.png</code>). Built with <strong>sql.js</strong> (SQLite &rarr; WebAssembly).</div><div class="log" id="o6"></div></div></div>
-</div>
-<div class="dl" id="dlBox">
-  <button class="dl-btn" id="dlBtn" disabled>Download .sut</button>
-  <div class="dl-note" id="dlNote"></div>
-</div>
-</div>
-<script>
+  <div class="wrap">
+    <header>
+      <h1>Procreate <em>&rarr;</em> Clip Studio Paint<br>Brush Converter</h1>
+      <p class="subtitle">Deconstructs <code>.brush</code> files (ZIP &rarr; binary plist &rarr; NSKeyedArchive &rarr; SilicaBrush) and rebuilds them as <code>.sut</code> files (SQLite + TAR). Everything runs in your browser via JSZip, a hand-written bplist parser, and sql.js (WASM). No server.</p>
+    </header>
+    <div class="drop" id="drop">
+      <div class="drop-icon">&#9671;</div>
+      <div class="drop-title">Drop a .brush or .brushset file</div>
+      <div class="drop-hint">Procreate brush files are ZIP archives &mdash; we unpack them in-browser</div>
+      <div class="drop-file" id="dropFile"></div>
+      <input type="file" id="fi" accept=".brush,.brushset">
+    </div>
+    <div class="pipeline" id="pipe">
+      <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">ZIP Extraction</span><span class="stg-badge wait" id="b1">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A <code>.brush</code> file is a <strong>renamed ZIP archive</strong>. Inside: <code>Brush.archive</code> (NSKeyedArchive binary plist with all settings), <code>Shape.png</code> (brush tip stamp, white = opaque), <code>Grain.png</code> (texture overlay), and optional metadata. We use <strong>JSZip</strong> to decompress entirely in the browser.</div><div class="log" id="o1"></div></div></div>
+      <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Binary Plist Decode</span><span class="stg-badge wait" id="b2">pending</span></div>
+      <div class="stg-body"><div class="stg-info"><code>Brush.archive</code> starts with magic <code>bplist00</code>. We read the <strong>32-byte trailer</strong> to locate the offset table, then decode each object by its <strong>type nibble</strong>: 0x0=singleton, 0x1=int, 0x2=float (IEEE 754 BE), 0x4=data, 0x5=ASCII, 0x6=UTF-16BE, <strong>0x8=UID</strong> (N+1 bytes), 0xA=array, 0xD=dict.</div><div class="log" id="o2"></div></div></div>
+      <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">NSKeyedArchive &rarr; SilicaBrush</span><span class="stg-badge wait" id="b3">pending</span></div>
+      <div class="stg-body"><div class="stg-info">The plist is an <strong>NSKeyedArchive</strong>. <code>$top.root</code> points via UID into a flat <code>$objects</code> array. We recursively resolve UIDs, unwrap <code>NSDictionary</code> / <code>NSArray</code> / <code>NSData</code> to recover the full <strong>SilicaBrush</strong> parameter dictionary (80+ keys across 14 Brush Studio panels).</div><div class="log" id="o3"></div></div></div>
+      <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Texture Extraction &amp; Inversion</span><span class="stg-badge wait" id="b4">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Procreate: <strong>white = opaque</strong>. CSP: <strong>dark = opaque</strong>. We draw each texture to an offscreen canvas, apply per-pixel <code>255 - value</code> inversion, then export as PNG for the .sut MaterialFile BLOB.</div>
+      <div class="tex-row" id="texRow">
+        <div class="tex-card"><canvas id="cv_so" width="200" height="200"></canvas><div class="tex-lbl"><b>Shape</b> original</div></div>
+        <div class="tex-card"><canvas id="cv_si" width="200" height="200"></canvas><div class="tex-lbl"><b>Shape</b> inverted (CSP)</div></div>
+        <div class="tex-card"><canvas id="cv_go" width="200" height="200"></canvas><div class="tex-lbl"><b>Grain</b> original</div></div>
+        <div class="tex-card"><canvas id="cv_gi" width="200" height="200"></canvas><div class="tex-lbl"><b>Grain</b> inverted (CSP)</div></div>
+      </div><div class="log" id="o4"></div></div></div>
+      <div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">Parameter Mapping</span><span class="stg-badge wait" id="b5">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Maps ~80 Procreate keys to CSP equivalents: <strong style="color:var(--green)">Direct</strong> (~60%), <strong style="color:var(--amber)">Approximate</strong> (~25%), <strong style="color:var(--rose)">No equivalent</strong> (~15%). Handles <strong>both old-style</strong> (pre-5.0: <code>plotSpacing</code>, <code>dynamicsPressureSize</code>) <strong>and new-style</strong> (5.0+: <code>spacing</code>, <code>pressureSize</code>) Procreate keys. Pressure curves use CSP linear default.</div>
+      <div class="ptbl-wrap"><table class="ptbl"><thead><tr><th>Procreate Key</th><th>Raw Value</th><th>CSP Mapping</th><th>Fidelity</th></tr></thead><tbody id="ptbody"></tbody></table></div>
+      <div class="log" id="o5"></div></div></div>
+      <div class="stg" id="s6"><div class="stg-head"><span class="stg-n">06</span><span class="stg-name">SQLite .sut Construction</span><span class="stg-badge wait" id="b6">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A CSP <code>.sut</code> is a <strong>SQLite 3 database</strong>: <code>Node</code> (identity), <code>Variant</code> (all params as typed columns), <code>MaterialFile</code> (brush tip as <strong>TAR archive</strong> BLOB at <code>thumbnail/thumbnail.png</code>). Built with <strong>sql.js</strong> (SQLite &rarr; WebAssembly).</div><div class="log" id="o6"></div></div></div>
+    </div>
+    <div class="dl" id="dlBox">
+      <button class="dl-btn" id="dlBtn" disabled>Download .sut</button>
+      <div class="dl-note" id="dlNote"></div>
+    </div>
+  </div>
+  <script>
 // ═══ BINARY PLIST PARSER ═══
-class UID{constructor(v){this.uid=v}toString(){return"UID("+this.uid+")"}}
-function parseBplist(buf){
-  var dv=new DataView(buf),u8=new Uint8Array(buf),len=buf.byteLength;
-  var magic=String.fromCharCode.apply(null,u8.slice(0,6));
-  if(magic!=="bplist")throw new Error("Not a binary plist (magic: "+magic+")");
-  var T=len-32,oIS=u8[T+6],oRS=u8[T+7],nObj=rU(dv,T+8,8),topIdx=rU(dv,T+16,8),otOff=rU(dv,T+24,8);
-  var offs=[];for(var i=0;i<nObj;i++)offs.push(rU(dv,otOff+i*oIS,oIS));
-  function parseObj(idx){
-    if(idx>=nObj)return null;var p=offs[idx],tb=u8[p],hi=(tb&0xF0)>>4,lo=tb&0x0F;p++;
-    function sz(){if(lo!==0x0F)return lo;var sb=u8[p];p++;var pw=sb&0x0F,nb=1<<pw,v=rU(dv,p,nb);p+=nb;return v}
-    switch(hi){
-      case 0x0:return lo===0?null:lo===8?false:lo===9?true:null;
-      case 0x1:{var n=1<<lo;return rS(dv,p,n)}
-      case 0x2:return lo===2?dv.getFloat32(p,false):lo===3?dv.getFloat64(p,false):0;
-      case 0x3:return new Date(978307200000+dv.getFloat64(p,false)*1000);
-      case 0x4:{var n2=sz();return u8.slice(p,p+n2)}
-      case 0x5:{var n3=sz();return String.fromCharCode.apply(null,u8.slice(p,p+n3))}
-      case 0x6:{var n4=sz(),s="";for(var j=0;j<n4;j++)s+=String.fromCharCode(dv.getUint16(p+j*2,false));return s}
-      case 0x8:{var n5=lo+1;return new UID(rU(dv,p,n5))}
-      case 0xA:case 0xC:{var n6=sz(),a=[];for(var j2=0;j2<n6;j2++)a.push(rU(dv,p+j2*oRS,oRS));return{_t:"arr",r:a}}
-      case 0xD:{var n7=sz(),k=[],v2=[];for(var j3=0;j3<n7;j3++)k.push(rU(dv,p+j3*oRS,oRS));var vp=p+n7*oRS;for(var j4=0;j4<n7;j4++)v2.push(rU(dv,vp+j4*oRS,oRS));return{_t:"dict",k:k,v:v2}}
-      default:return null;
+    class UID{constructor(v){this.uid=v}toString(){return"UID("+this.uid+")"}}
+    function parseBplist(buf){
+      var dv=new DataView(buf),u8=new Uint8Array(buf),len=buf.byteLength;
+      var magic=String.fromCharCode.apply(null,u8.slice(0,6));
+      if(magic!=="bplist")throw new Error("Not a binary plist (magic: "+magic+")");
+      var T=len-32,oIS=u8[T+6],oRS=u8[T+7],nObj=rU(dv,T+8,8),topIdx=rU(dv,T+16,8),otOff=rU(dv,T+24,8);
+      var offs=[];for(var i=0;i<nObj;i++)offs.push(rU(dv,otOff+i*oIS,oIS));
+      function parseObj(idx){
+        if(idx>=nObj)return null;var p=offs[idx],tb=u8[p],hi=(tb&0xF0)>>4,lo=tb&0x0F;p++;
+        function sz(){if(lo!==0x0F)return lo;var sb=u8[p];p++;var pw=sb&0x0F,nb=1<<pw,v=rU(dv,p,nb);p+=nb;return v}
+        switch(hi){
+        case 0x0:return lo===0?null:lo===8?false:lo===9?true:null;
+        case 0x1:{var n=1<<lo;return rS(dv,p,n)}
+        case 0x2:return lo===2?dv.getFloat32(p,false):lo===3?dv.getFloat64(p,false):0;
+        case 0x3:return new Date(978307200000+dv.getFloat64(p,false)*1000);
+        case 0x4:{var n2=sz();return u8.slice(p,p+n2)}
+        case 0x5:{var n3=sz();return String.fromCharCode.apply(null,u8.slice(p,p+n3))}
+        case 0x6:{var n4=sz(),s="";for(var j=0;j<n4;j++)s+=String.fromCharCode(dv.getUint16(p+j*2,false));return s}
+        case 0x8:{var n5=lo+1;return new UID(rU(dv,p,n5))}
+        case 0xA:case 0xC:{var n6=sz(),a=[];for(var j2=0;j2<n6;j2++)a.push(rU(dv,p+j2*oRS,oRS));return{_t:"arr",r:a}}
+        case 0xD:{var n7=sz(),k=[],v2=[];for(var j3=0;j3<n7;j3++)k.push(rU(dv,p+j3*oRS,oRS));var vp=p+n7*oRS;for(var j4=0;j4<n7;j4++)v2.push(rU(dv,vp+j4*oRS,oRS));return{_t:"dict",k:k,v:v2}}
+        default:return null;
+        }
+      }
+      var raw=[];for(var i2=0;i2<nObj;i2++)raw.push(parseObj(i2));
+      var cache=new Map();
+      function res(i3,d){
+        if(d>80)return"<depth>";if(cache.has(i3))return cache.get(i3);
+        var o=raw[i3];if(o===null||o===undefined){cache.set(i3,null);return null}
+        if(typeof o!=="object"||o instanceof Date||o instanceof Uint8Array||o instanceof UID){cache.set(i3,o);return o}
+        if(o._t==="arr"){var a2=[];cache.set(i3,a2);for(var j5=0;j5<o.r.length;j5++)a2.push(res(o.r[j5],d+1));return a2}
+        if(o._t==="dict"){var m={};cache.set(i3,m);for(var j6=0;j6<o.k.length;j6++){var kk=res(o.k[j6],d+1);m[String(kk)]=res(o.v[j6],d+1)}return m}
+        cache.set(i3,o);return o;
+      }
+      return{top:res(topIdx,0),raw:raw,nObj:nObj};
     }
-  }
-  var raw=[];for(var i2=0;i2<nObj;i2++)raw.push(parseObj(i2));
-  var cache=new Map();
-  function res(i3,d){
-    if(d>80)return"<depth>";if(cache.has(i3))return cache.get(i3);
-    var o=raw[i3];if(o===null||o===undefined){cache.set(i3,null);return null}
-    if(typeof o!=="object"||o instanceof Date||o instanceof Uint8Array||o instanceof UID){cache.set(i3,o);return o}
-    if(o._t==="arr"){var a2=[];cache.set(i3,a2);for(var j5=0;j5<o.r.length;j5++)a2.push(res(o.r[j5],d+1));return a2}
-    if(o._t==="dict"){var m={};cache.set(i3,m);for(var j6=0;j6<o.k.length;j6++){var kk=res(o.k[j6],d+1);m[String(kk)]=res(o.v[j6],d+1)}return m}
-    cache.set(i3,o);return o;
-  }
-  return{top:res(topIdx,0),raw:raw,nObj:nObj};
-}
-function rU(v,o,s){var r=0n;for(var i=0;i<s;i++)r=(r<<8n)|BigInt(v.getUint8(o+i));return Number(r)}
-function rS(v,o,s){if(s===1)return v.getInt8(o);if(s===2)return v.getInt16(o,false);if(s===4)return v.getInt32(o,false);if(s===8){var h=v.getInt32(o,false),l=v.getUint32(o+4,false);return h*0x100000000+l}return rU(v,o,s)}
+    function rU(v,o,s){var r=0n;for(var i=0;i<s;i++)r=(r<<8n)|BigInt(v.getUint8(o+i));return Number(r)}
+    function rS(v,o,s){if(s===1)return v.getInt8(o);if(s===2)return v.getInt16(o,false);if(s===4)return v.getInt32(o,false);if(s===8){var h=v.getInt32(o,false),l=v.getUint32(o+4,false);return h*0x100000000+l}return rU(v,o,s)}
 
 // ═══ NSKEYED ARCHIVE RESOLVER ═══
-function resolveNSKA(pl){
-  if(!pl||!pl["$objects"]||!pl["$top"])return pl;
-  var ob=pl["$objects"],rootU=pl["$top"]["root"];
-  if(!(rootU instanceof UID))return pl;
-  var ch=new Map(),vis=new Set();
-  function r(v,d){
-    if(d>60)return"<depth>";if(v==null)return null;if(v==="$null")return null;
-    if(v instanceof UID){if(vis.has(v.uid))return"<circ>";if(ch.has(v.uid))return ch.get(v.uid);vis.add(v.uid);var x=r(ob[v.uid],d+1);ch.set(v.uid,x);vis.delete(v.uid);return x}
-    if(Array.isArray(v))return v.map(function(x2){return r(x2,d+1)});
-    if(v instanceof Uint8Array||v instanceof Date)return v;
-    if(typeof v==="object"){
-      if(v["NS.keys"]&&v["NS.objects"]){var ks=r(v["NS.keys"],d+1)||[],vs=r(v["NS.objects"],d+1)||[],m2={};for(var i=0;i<ks.length;i++)m2[String(ks[i])]=vs[i]!==undefined?vs[i]:null;return m2}
-      if(v["NS.objects"])return r(v["NS.objects"],d+1);
-      if(v["NS.data"]!==undefined)return r(v["NS.data"],d+1);
-      var m3={};for(var kk in v){if(kk==="$class")continue;m3[kk]=r(v[kk],d+1)}return m3;
+    function resolveNSKA(pl){
+      if(!pl||!pl["$objects"]||!pl["$top"])return pl;
+      var ob=pl["$objects"],rootU=pl["$top"]["root"];
+      if(!(rootU instanceof UID))return pl;
+      var ch=new Map(),vis=new Set();
+      function r(v,d){
+        if(d>60)return"<depth>";if(v==null)return null;if(v==="$null")return null;
+        if(v instanceof UID){if(vis.has(v.uid))return"<circ>";if(ch.has(v.uid))return ch.get(v.uid);vis.add(v.uid);var x=r(ob[v.uid],d+1);ch.set(v.uid,x);vis.delete(v.uid);return x}
+        if(Array.isArray(v))return v.map(function(x2){return r(x2,d+1)});
+        if(v instanceof Uint8Array||v instanceof Date)return v;
+        if(typeof v==="object"){
+          if(v["NS.keys"]&&v["NS.objects"]){var ks=r(v["NS.keys"],d+1)||[],vs=r(v["NS.objects"],d+1)||[],m2={};for(var i=0;i<ks.length;i++)m2[String(ks[i])]=vs[i]!==undefined?vs[i]:null;return m2}
+          if(v["NS.objects"])return r(v["NS.objects"],d+1);
+          if(v["NS.data"]!==undefined)return r(v["NS.data"],d+1);
+          var m3={};for(var kk in v){if(kk==="$class")continue;m3[kk]=r(v[kk],d+1)}return m3;
+        }
+        return v;
+      }
+      return r(rootU,0);
     }
-    return v;
-  }
-  return r(rootU,0);
-}
 
 // ═══ PARAMETER MAP ═══
-var M={
-  spacing:{c:"Gap",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  streamline:{c:"Stabilization",f:"apx",fn:function(v){return Math.round(v*20)}},
-  stabilization:{c:"Stabilization",f:"apx",fn:function(v){return Math.round(v*20)}},
-  jitter:{c:"Spraying:Deviation",f:"apx",fn:function(v){return Math.round(v*100)}},
-  jitterLinear:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  spacingJitter:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  fallOff:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  paintSize:{c:"BrushSize max",f:"dir",fn:function(v){return Math.round(v)+"px"}},
-  maximumSize:{c:"BrushSize max",f:"dir",fn:function(v){return Math.round(v)+"px"}},
-  brushSize:{c:"BrushSize",f:"dir",fn:function(v){return Math.round(v)+"px"}},
-  paintSizeMin:{c:"BrushSize min%",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  minimumSize:{c:"BrushSize min%",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  paintOpacity:{c:"PaintOpacity",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  brushOpacity:{c:"PaintOpacity",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  maximumOpacity:{c:"PaintOpacity max",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  minimumOpacity:{c:"Opacity min dyn",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  blendMode:{c:"PaintBlendMode",f:"dir",fn:function(v){return v}},
-  flow:{c:"BrushDensity",f:"apx",fn:function(v){return Math.round(v*100)}},
-  shapeRotation:{c:"Direction",f:"dir",fn:function(v){return(v*360).toFixed(1)+"deg"}},
-  shapeRandomizedRotation:{c:"AngleRange",f:"dir",fn:function(v){return v>0?"Random":"Fixed"}},
-  shapeRandomized:{c:"AngleRange",f:"dir",fn:function(v){return v?"Random":"Fixed"}},
-  shapeRoundness:{c:"Thickness",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  shapeScatter:{c:"Spray:ParticleSize",f:"apx",fn:function(v){return Math.round(v*100)}},
-  shapeFlipX:{c:"FlipHorizontal",f:"dir",fn:function(v){return v?"On":"Off"}},
-  shapeFlipY:{c:"FlipVertical",f:"dir",fn:function(v){return v?"On":"Off"}},
-  shapeCount:{c:"ParticleDensity",f:"apx",fn:function(v){return v}},
-  pressureSize:{c:"Size Effector:Pressure",f:"dir",fn:function(v){return v>0?"On":"Off"}},
-  pressureOpacity:{c:"Opacity Effector:Pressure",f:"dir",fn:function(v){return v>0?"On":"Off"}},
-  tiltSize:{c:"Size Effector:Tilt",f:"dir",fn:function(v){return v>0?"On":"Off"}},
-  speedSize:{c:"Size Effector:Velocity",f:"dir",fn:function(v){return v>0?"On":"Off"}},
-  grainMoving:{c:"(no equiv-canvas fixed)",f:"non",fn:function(v){return v?"Moving":"Texturized"}},
-  grainScale:{c:"TextureScale",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  grainZoom:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  grainDepth:{c:"TextureDensity",f:"apx",fn:function(v){return Math.round(v*100)}},
-  grainBlendMode:{c:"Texture BlendMode",f:"apx",fn:function(v){return v}},
-  wetMixDilution:{c:"AmountOfPaint(inv)",f:"apx",fn:function(v){return Math.round((1-v)*100)}},
-  wetMixCharge:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  wetMixPull:{c:"ColorStretch",f:"apx",fn:function(v){return Math.round(v*100)}},
-  wetMixAttack:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  wetMixGrade:{c:"(no equiv)",f:"non",fn:function(v){return v}},
-  wetEdges:{c:"WatercolorEdge",f:"apx",fn:function(v){return Math.round(v*100)}},
-  renderingMode:{c:"Ink mode",f:"apx",fn:function(v){return["","LGlaze>Pen","UGlaze>Pen","IGlaze>Pen","HGlaze>Pen","UBlend>WC","IBlend>WC"][v]||v}},
-  name:{c:"NodeName",f:"dir",fn:function(v){return v}},
-  smudgeAmount:{c:"ColorStretch",f:"apx",fn:function(v){return Math.round(v*100)}},
-  taperSizeBegin:{c:"StartingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  taperSizeEnd:{c:"EndingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  stampColorJitterHue:{c:"ColorJitter Hue",f:"dir",fn:function(v){return Math.round(v*100)}},
-  stampColorJitterSaturation:{c:"ColorJitter Sat",f:"dir",fn:function(v){return Math.round(v*100)}},
-  stampColorJitterBrightness:{c:"ColorJitter Val",f:"dir",fn:function(v){return Math.round(v*100)}},
+    var M={
+      spacing:{c:"Gap",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      streamline:{c:"Stabilization",f:"apx",fn:function(v){return Math.round(v*20)}},
+      stabilization:{c:"Stabilization",f:"apx",fn:function(v){return Math.round(v*20)}},
+      jitter:{c:"Spraying:Deviation",f:"apx",fn:function(v){return Math.round(v*100)}},
+      jitterLinear:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      spacingJitter:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      fallOff:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      paintSize:{c:"BrushSize max",f:"dir",fn:function(v){return Math.round(v)+"px"}},
+      maximumSize:{c:"BrushSize max",f:"dir",fn:function(v){return Math.round(v)+"px"}},
+      brushSize:{c:"BrushSize",f:"dir",fn:function(v){return Math.round(v)+"px"}},
+      paintSizeMin:{c:"BrushSize min%",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      minimumSize:{c:"BrushSize min%",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      paintOpacity:{c:"PaintOpacity",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      brushOpacity:{c:"PaintOpacity",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      maximumOpacity:{c:"PaintOpacity max",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      minimumOpacity:{c:"Opacity min dyn",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      blendMode:{c:"PaintBlendMode",f:"dir",fn:function(v){return v}},
+      flow:{c:"BrushDensity",f:"apx",fn:function(v){return Math.round(v*100)}},
+      shapeRotation:{c:"Direction",f:"dir",fn:function(v){return(v*360).toFixed(1)+"deg"}},
+      shapeRandomizedRotation:{c:"AngleRange",f:"dir",fn:function(v){return v>0?"Random":"Fixed"}},
+      shapeRandomized:{c:"AngleRange",f:"dir",fn:function(v){return v?"Random":"Fixed"}},
+      shapeRoundness:{c:"Thickness",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      shapeScatter:{c:"Spray:ParticleSize",f:"apx",fn:function(v){return Math.round(v*100)}},
+      shapeFlipX:{c:"FlipHorizontal",f:"dir",fn:function(v){return v?"On":"Off"}},
+      shapeFlipY:{c:"FlipVertical",f:"dir",fn:function(v){return v?"On":"Off"}},
+      shapeCount:{c:"ParticleDensity",f:"apx",fn:function(v){return v}},
+      pressureSize:{c:"Size Effector:Pressure",f:"dir",fn:function(v){return v>0?"On":"Off"}},
+      pressureOpacity:{c:"Opacity Effector:Pressure",f:"dir",fn:function(v){return v>0?"On":"Off"}},
+      tiltSize:{c:"Size Effector:Tilt",f:"dir",fn:function(v){return v>0?"On":"Off"}},
+      speedSize:{c:"Size Effector:Velocity",f:"dir",fn:function(v){return v>0?"On":"Off"}},
+      grainMoving:{c:"(no equiv-canvas fixed)",f:"non",fn:function(v){return v?"Moving":"Texturized"}},
+      grainScale:{c:"TextureScale",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      grainZoom:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      grainDepth:{c:"TextureDensity",f:"apx",fn:function(v){return Math.round(v*100)}},
+      grainBlendMode:{c:"Texture BlendMode",f:"apx",fn:function(v){return v}},
+      wetMixDilution:{c:"AmountOfPaint(inv)",f:"apx",fn:function(v){return Math.round((1-v)*100)}},
+      wetMixCharge:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      wetMixPull:{c:"ColorStretch",f:"apx",fn:function(v){return Math.round(v*100)}},
+      wetMixAttack:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      wetMixGrade:{c:"(no equiv)",f:"non",fn:function(v){return v}},
+      wetEdges:{c:"WatercolorEdge",f:"apx",fn:function(v){return Math.round(v*100)}},
+      renderingMode:{c:"Ink mode",f:"apx",fn:function(v){return["","LGlaze>Pen","UGlaze>Pen","IGlaze>Pen","HGlaze>Pen","UBlend>WC","IBlend>WC"][v]||v}},
+      name:{c:"NodeName",f:"dir",fn:function(v){return v}},
+      smudgeAmount:{c:"ColorStretch",f:"apx",fn:function(v){return Math.round(v*100)}},
+      taperSizeBegin:{c:"StartingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      taperSizeEnd:{c:"EndingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      stampColorJitterHue:{c:"ColorJitter Hue",f:"dir",fn:function(v){return Math.round(v*100)}},
+      stampColorJitterSaturation:{c:"ColorJitter Sat",f:"dir",fn:function(v){return Math.round(v*100)}},
+      stampColorJitterBrightness:{c:"ColorJitter Val",f:"dir",fn:function(v){return Math.round(v*100)}},
   // ── Old-style Procreate keys (pre-5.0 brushes) ──
-  plotSpacing:{c:"Gap",f:"dir",fn:function(v){return(v*100).toFixed(1)+"%"}},
-  plotJitter:{c:"SprayDeviation",f:"apx",fn:function(v){return Math.round(v*100)}},
-  minSize:{c:"BrushSizeMinRatio",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  maxSize:{c:"BrushSizeMaxRatio",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  minOpacity:{c:"PaintOpacityMin",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  maxOpacity:{c:"PaintOpacityMax",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
-  dynamicsPressureSize:{c:"DynPressureSize",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsPressureOpacity:{c:"DynPressureOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsSpeedSize:{c:"DynSpeedSize",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsSpeedOpacity:{c:"DynSpeedOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsFalloff:{c:"DynFalloff",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsMix:{c:"DynMix",f:"dir",fn:function(v){return v.toFixed(2)}},
-  dynamicsGlaze:{c:"DynGlaze",f:"dir",fn:function(v){return v?"On":"Off"}},
-  shapeRandomise:{c:"DirectionRange",f:"dir",fn:function(v){return v?"Random":"Fixed"}},
-  textureMovement:{c:"TexMovement",f:"dir",fn:function(v){return v.toFixed(2)}},
-  textureZoom:{c:"TexZoom",f:"dir",fn:function(v){return v.toFixed(2)}},
-  textureRotation:{c:"TexRotation",f:"dir",fn:function(v){return(v*360).toFixed(1)+"deg"}},
-  textureFilter:{c:"TexFilter",f:"dir",fn:function(v){return v?"On":"Off"}},
-  textureScale:{c:"TextureScale",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  taperStartLength:{c:"StartingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  taperEndLength:{c:"EndingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
-  taperSize:{c:"TaperSize",f:"dir",fn:function(v){return v.toFixed(2)}},
-  taperOpacity:{c:"TaperOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
-  oriented:{c:"Oriented",f:"dir",fn:function(v){return v?"On":"Off"}},
-  stamp:{c:"Stamp",f:"dir",fn:function(v){return v?"On":"Off"}},
-  eraseSize:{c:"(eraser-only)",f:"non",fn:function(v){return v.toFixed(2)}},
-  eraseOpacity:{c:"(eraser-only)",f:"non",fn:function(v){return v.toFixed(2)}},
-  smudgeSize:{c:"(smudge-only)",f:"non",fn:function(v){return v.toFixed(2)}},
-  smudgeOpacity:{c:"(smudge-only)",f:"non",fn:function(v){return v.toFixed(2)}},
-};
+      plotSpacing:{c:"Gap",f:"dir",fn:function(v){return(v*100).toFixed(1)+"%"}},
+      plotJitter:{c:"SprayDeviation",f:"apx",fn:function(v){return Math.round(v*100)}},
+      minSize:{c:"BrushSizeMinRatio",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      maxSize:{c:"BrushSizeMaxRatio",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      minOpacity:{c:"PaintOpacityMin",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      maxOpacity:{c:"PaintOpacityMax",f:"dir",fn:function(v){return Math.round(v*100)+"%"}},
+      dynamicsPressureSize:{c:"DynPressureSize",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsPressureOpacity:{c:"DynPressureOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsSpeedSize:{c:"DynSpeedSize",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsSpeedOpacity:{c:"DynSpeedOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsFalloff:{c:"DynFalloff",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsMix:{c:"DynMix",f:"dir",fn:function(v){return v.toFixed(2)}},
+      dynamicsGlaze:{c:"DynGlaze",f:"dir",fn:function(v){return v?"On":"Off"}},
+      shapeRandomise:{c:"DirectionRange",f:"dir",fn:function(v){return v?"Random":"Fixed"}},
+      textureMovement:{c:"TexMovement",f:"dir",fn:function(v){return v.toFixed(2)}},
+      textureZoom:{c:"TexZoom",f:"dir",fn:function(v){return v.toFixed(2)}},
+      textureRotation:{c:"TexRotation",f:"dir",fn:function(v){return(v*360).toFixed(1)+"deg"}},
+      textureFilter:{c:"TexFilter",f:"dir",fn:function(v){return v?"On":"Off"}},
+      textureScale:{c:"TextureScale",f:"dir",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      taperStartLength:{c:"StartingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      taperEndLength:{c:"EndingLength",f:"apx",fn:function(v){return(v*100).toFixed(0)+"%"}},
+      taperSize:{c:"TaperSize",f:"dir",fn:function(v){return v.toFixed(2)}},
+      taperOpacity:{c:"TaperOpacity",f:"dir",fn:function(v){return v.toFixed(2)}},
+      oriented:{c:"Oriented",f:"dir",fn:function(v){return v?"On":"Off"}},
+      stamp:{c:"Stamp",f:"dir",fn:function(v){return v?"On":"Off"}},
+      eraseSize:{c:"(eraser-only)",f:"non",fn:function(v){return v.toFixed(2)}},
+      eraseOpacity:{c:"(eraser-only)",f:"non",fn:function(v){return v.toFixed(2)}},
+      smudgeSize:{c:"(smudge-only)",f:"non",fn:function(v){return v.toFixed(2)}},
+      smudgeOpacity:{c:"(smudge-only)",f:"non",fn:function(v){return v.toFixed(2)}},
+    };
 
 // ═══ TAR BUILDER ═══
-function buildTar(fname,data){
-  var enc=new TextEncoder(),hdr=new Uint8Array(512);
-  hdr.set(enc.encode(fname).slice(0,100),0);
-  hdr.set(enc.encode("0000644\0"),100);hdr.set(enc.encode("0001000\0"),108);hdr.set(enc.encode("0001000\0"),116);
-  hdr.set(enc.encode(data.length.toString(8).padStart(11,"0")+"\0"),124);
-  hdr.set(enc.encode(Math.floor(Date.now()/1000).toString(8).padStart(11,"0")+"\0"),136);
-  hdr.set(enc.encode("        "),148);hdr[156]=0x30;
-  hdr.set(enc.encode("ustar\0"),257);hdr.set(enc.encode("00"),263);
-  var ck=0;for(var i=0;i<512;i++)ck+=hdr[i];
-  hdr.set(enc.encode(ck.toString(8).padStart(6,"0")+"\0 "),148);
-  var pad=new Uint8Array(Math.ceil(data.length/512)*512);pad.set(data);
-  var end=new Uint8Array(1024);
-  var out=new Uint8Array(512+pad.length+1024);
-  out.set(hdr,0);out.set(pad,512);out.set(end,512+pad.length);return out;
-}
+    function buildTar(fname,data){
+      var enc=new TextEncoder(),hdr=new Uint8Array(512);
+      hdr.set(enc.encode(fname).slice(0,100),0);
+      hdr.set(enc.encode("0000644\0"),100);hdr.set(enc.encode("0001000\0"),108);hdr.set(enc.encode("0001000\0"),116);
+      hdr.set(enc.encode(data.length.toString(8).padStart(11,"0")+"\0"),124);
+      hdr.set(enc.encode(Math.floor(Date.now()/1000).toString(8).padStart(11,"0")+"\0"),136);
+      hdr.set(enc.encode("        "),148);hdr[156]=0x30;
+      hdr.set(enc.encode("ustar\0"),257);hdr.set(enc.encode("00"),263);
+      var ck=0;for(var i=0;i<512;i++)ck+=hdr[i];
+      hdr.set(enc.encode(ck.toString(8).padStart(6,"0")+"\0 "),148);
+      var pad=new Uint8Array(Math.ceil(data.length/512)*512);pad.set(data);
+      var end=new Uint8Array(1024);
+      var out=new Uint8Array(512+pad.length+1024);
+      out.set(hdr,0);out.set(pad,512);out.set(end,512+pad.length);return out;
+    }
 
 // ═══ UI ═══
-function L(n,t,cls){var el=document.getElementById("o"+n),d=document.createElement("span");d.className=cls||"";d.textContent=t+"\n";el.appendChild(d);el.scrollTop=el.scrollHeight}
-function B(n,s){var b=document.getElementById("b"+n);b.className="stg-badge "+s;b.textContent=s==="run"?"running":s==="ok"?"done":s==="err"?"error":"pending";
-var st=document.getElementById("s"+n);st.className="stg"+(s==="run"?" run":s==="ok"?" ok":s==="err"?" err":"")}
-function drawImg(cid,bytes){var cv=document.getElementById(cid),ctx=cv.getContext("2d");var blob=new Blob([bytes]),url=URL.createObjectURL(blob),img=new Image();return new Promise(function(ok,no){img.onload=function(){cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);URL.revokeObjectURL(url);ok(ctx)};img.onerror=function(){URL.revokeObjectURL(url);no(new Error("Failed to load image from "+bytes.length+" bytes - PNG may be corrupt"))};img.src=url})}
-function invertCv(src,dst){var sc=document.getElementById(src),dc=document.getElementById(dst),sctx=sc.getContext("2d"),w=sc.width,h=sc.height;dc.width=w;dc.height=h;var dctx=dc.getContext("2d"),id=sctx.getImageData(0,0,w,h),d=id.data;for(var i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}dctx.putImageData(id,0,0)}
-function cvPng(cid){return new Promise(function(ok){document.getElementById(cid).toBlob(function(b){var r=new FileReader();r.onload=function(){ok(new Uint8Array(r.result))};r.readAsArrayBuffer(b)},"image/png")})}
+    function L(n,t,cls){var el=document.getElementById("o"+n),d=document.createElement("span");d.className=cls||"";d.textContent=t+"\n";el.appendChild(d);el.scrollTop=el.scrollHeight}
+    function B(n,s){var b=document.getElementById("b"+n);b.className="stg-badge "+s;b.textContent=s==="run"?"running":s==="ok"?"done":s==="err"?"error":"pending";
+    var st=document.getElementById("s"+n);st.className="stg"+(s==="run"?" run":s==="ok"?" ok":s==="err"?" err":"")}
+    function drawImg(cid,bytes){var cv=document.getElementById(cid),ctx=cv.getContext("2d");var blob=new Blob([bytes]),url=URL.createObjectURL(blob),img=new Image();return new Promise(function(ok,no){img.onload=function(){cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);URL.revokeObjectURL(url);ok(ctx)};img.onerror=function(){URL.revokeObjectURL(url);no(new Error("Failed to load image from "+bytes.length+" bytes - PNG may be corrupt"))};img.src=url})}
+    function invertCv(src,dst){var sc=document.getElementById(src),dc=document.getElementById(dst),sctx=sc.getContext("2d"),w=sc.width,h=sc.height;dc.width=w;dc.height=h;var dctx=dc.getContext("2d"),id=sctx.getImageData(0,0,w,h),d=id.data;for(var i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}dctx.putImageData(id,0,0)}
+    function cvPng(cid){return new Promise(function(ok){document.getElementById(cid).toBlob(function(b){var r=new FileReader();r.onload=function(){ok(new Uint8Array(r.result))};r.readAsArrayBuffer(b)},"image/png")})}
 
 // ═══ PIPELINE ═══
-var sutOut=null;
-async function run(file){
-  sutOut=null;document.getElementById("dlBox").classList.remove("show");
-  for(var i=1;i<=6;i++){B(i,"wait");document.getElementById("o"+i).innerHTML=""}
-  document.getElementById("ptbody").innerHTML="";
-  try{
-    B(1,"run");L(1,"File: "+file.name+"  ("+(file.size/1024).toFixed(1)+" KB)");
-    var ab=await file.arrayBuffer(),zip=await JSZip.loadAsync(ab),names=Object.keys(zip.files);
-    L(1,"ZIP: "+names.length+" entries","g");names.forEach(function(n){L(1,"  "+n,"d")});
-    var archName=names.find(function(n){return /Brush\.archive$/i.test(n)});
-    if(!archName)throw new Error("No Brush.archive found");
-    var prefix=archName.replace(/Brush\.archive$/i,"");
-    var ff=function(pat){return names.find(function(n){return n.startsWith(prefix)&&pat.test(n.slice(prefix.length))})};
-    L(1,"\n-> Archive: "+archName,"c");
-    var shapeEntry=ff(/^Shape\.png$/i),grainEntry=ff(/^Grain\.png$/i);
-    L(1,"-> Shape.png: "+(shapeEntry?"found":"missing"),shapeEntry?"g":"w");
-    L(1,"-> Grain.png: "+(grainEntry?"found":"missing"),grainEntry?"g":"w");
-    B(1,"ok");
+    var sutOut=null;
+    async function run(file){
+      sutOut=null;document.getElementById("dlBox").classList.remove("show");
+      for(var i=1;i<=6;i++){B(i,"wait");document.getElementById("o"+i).innerHTML=""}
+        document.getElementById("ptbody").innerHTML="";
+      try{
+        B(1,"run");L(1,"File: "+file.name+"  ("+(file.size/1024).toFixed(1)+" KB)");
+        var ab=await file.arrayBuffer(),zip=await JSZip.loadAsync(ab),names=Object.keys(zip.files);
+        L(1,"ZIP: "+names.length+" entries","g");names.forEach(function(n){L(1,"  "+n,"d")});
+        var archName=names.find(function(n){return /Brush\.archive$/i.test(n)});
+        if(!archName)throw new Error("No Brush.archive found");
+        var prefix=archName.replace(/Brush\.archive$/i,"");
+        var ff=function(pat){return names.find(function(n){return n.startsWith(prefix)&&pat.test(n.slice(prefix.length))})};
+        L(1,"\n-> Archive: "+archName,"c");
+        var shapeEntry=ff(/^Shape\.png$/i),grainEntry=ff(/^Grain\.png$/i);
+        L(1,"-> Shape.png: "+(shapeEntry?"found":"missing"),shapeEntry?"g":"w");
+        L(1,"-> Grain.png: "+(grainEntry?"found":"missing"),grainEntry?"g":"w");
+        B(1,"ok");
 
-    B(2,"run");var archBuf=await zip.file(archName).async("arraybuffer");
-    L(2,"Archive: "+archBuf.byteLength+" bytes");
-    L(2,'Magic: "'+String.fromCharCode.apply(null,new Uint8Array(archBuf.slice(0,8)))+'"',"c");
-    var pl=parseBplist(archBuf);L(2,"Decoded "+pl.nObj+" objects","g");
-    var tc={null:0,bool:0,number:0,string:0,data:0,uid:0,array:0,dict:0};
-    pl.raw.forEach(function(o){if(o==null)tc.null++;else if(typeof o==="boolean")tc.bool++;else if(typeof o==="number")tc.number++;else if(typeof o==="string")tc.string++;else if(o instanceof Uint8Array)tc.data++;else if(o instanceof UID)tc.uid++;else if(o&&o._t==="arr")tc.array++;else if(o&&o._t==="dict")tc.dict++});
-    L(2,"\nType breakdown:","d");for(var tk in tc)if(tc[tk])L(2,"  "+tk+": "+tc[tk],"d");
-    B(2,"ok");
+        B(2,"run");var archBuf=await zip.file(archName).async("arraybuffer");
+        L(2,"Archive: "+archBuf.byteLength+" bytes");
+        L(2,'Magic: "'+String.fromCharCode.apply(null,new Uint8Array(archBuf.slice(0,8)))+'"',"c");
+        var pl=parseBplist(archBuf);L(2,"Decoded "+pl.nObj+" objects","g");
+        var tc={null:0,bool:0,number:0,string:0,data:0,uid:0,array:0,dict:0};
+        pl.raw.forEach(function(o){if(o==null)tc.null++;else if(typeof o==="boolean")tc.bool++;else if(typeof o==="number")tc.number++;else if(typeof o==="string")tc.string++;else if(o instanceof Uint8Array)tc.data++;else if(o instanceof UID)tc.uid++;else if(o&&o._t==="arr")tc.array++;else if(o&&o._t==="dict")tc.dict++});
+        L(2,"\nType breakdown:","d");for(var tk in tc)if(tc[tk])L(2,"  "+tk+": "+tc[tk],"d");
+        B(2,"ok");
 
-    B(3,"run");var top=pl.top;
-    L(3,"$archiver: "+(top&&top["$archiver"]||"?"),"c");
-    L(3,"$version: "+(top&&top["$version"]||"?"));
-    if(!top||!top["$objects"])throw new Error("Missing $objects");
-    L(3,"$objects: "+top["$objects"].length+" items");
-    var bp=resolveNSKA(top),flat={};
-    (function walk(o){if(!o||typeof o!=="object"||o instanceof Uint8Array||o instanceof Date||Array.isArray(o))return;for(var kk in o){if(kk.charAt(0)==="$"||kk.indexOf("NS.")===0)continue;var vv=o[kk];if(vv==null)continue;if(typeof vv==="number"||typeof vv==="boolean"||typeof vv==="string")flat[kk]=vv;else if(typeof vv==="object"&&!(vv instanceof Uint8Array)&&!(vv instanceof Date)&&!Array.isArray(vv))walk(vv)}})(bp);
-    var bName=flat.name||flat.paintName||file.name.replace(/\.(brush|brushset)$/i,"");
-    L(3,'\nBrush: "'+bName+'"',"c");L(3,"Params: "+Object.keys(flat).length,"g");
-    ["spacing","plotSpacing","brushSize","paintSize","brushOpacity","paintOpacity","streamline","jitter","plotJitter","flow","renderingMode","grainDepth","dynamicsSpeedSize","dynamicsPressureOpacity","textureScale","minSize","maxSize"].forEach(function(k){if(flat[k]!==undefined)L(3,"  "+k+": "+(typeof flat[k]==="number"?flat[k].toFixed(4):flat[k]),"d")});
-    B(3,"ok");
+        B(3,"run");var top=pl.top;
+        L(3,"$archiver: "+(top&&top["$archiver"]||"?"),"c");
+        L(3,"$version: "+(top&&top["$version"]||"?"));
+        if(!top||!top["$objects"])throw new Error("Missing $objects");
+        L(3,"$objects: "+top["$objects"].length+" items");
+        var bp=resolveNSKA(top),flat={};
+        (function walk(o){if(!o||typeof o!=="object"||o instanceof Uint8Array||o instanceof Date||Array.isArray(o))return;for(var kk in o){if(kk.charAt(0)==="$"||kk.indexOf("NS.")===0)continue;var vv=o[kk];if(vv==null)continue;if(typeof vv==="number"||typeof vv==="boolean"||typeof vv==="string")flat[kk]=vv;else if(typeof vv==="object"&&!(vv instanceof Uint8Array)&&!(vv instanceof Date)&&!Array.isArray(vv))walk(vv)}})(bp);
+        var bName=flat.name||flat.paintName||file.name.replace(/\.(brush|brushset)$/i,"");
+        L(3,'\nBrush: "'+bName+'"',"c");L(3,"Params: "+Object.keys(flat).length,"g");
+        ["spacing","plotSpacing","brushSize","paintSize","brushOpacity","paintOpacity","streamline","jitter","plotJitter","flow","renderingMode","grainDepth","dynamicsSpeedSize","dynamicsPressureOpacity","textureScale","minSize","maxSize"].forEach(function(k){if(flat[k]!==undefined)L(3,"  "+k+": "+(typeof flat[k]==="number"?flat[k].toFixed(4):flat[k]),"d")});
+        B(3,"ok");
 
-    B(4,"run");
-    if(shapeEntry){var sb=await zip.file(shapeEntry).async("uint8array");L(4,"Shape.png: "+sb.length+" bytes","g");await drawImg("cv_so",sb);invertCv("cv_so","cv_si");var sc2=document.getElementById("cv_so");L(4,"  "+sc2.width+"x"+sc2.height+"px inverted")}
-    else{L(4,"No Shape.png - fallback circle","w");var c=document.getElementById("cv_so");c.width=c.height=256;var x=c.getContext("2d");x.fillStyle="#000";x.fillRect(0,0,256,256);x.fillStyle="#fff";x.beginPath();x.arc(128,128,112,0,Math.PI*2);x.fill();invertCv("cv_so","cv_si")}
-    if(grainEntry){var gb=await zip.file(grainEntry).async("uint8array");L(4,"Grain.png: "+gb.length+" bytes","g");await drawImg("cv_go",gb);invertCv("cv_go","cv_gi");var gc=document.getElementById("cv_go");L(4,"  "+gc.width+"x"+gc.height+"px inverted")}
-    else{L(4,"No Grain.png","w");["cv_go","cv_gi"].forEach(function(id){var c2=document.getElementById(id);c2.width=c2.height=128;var x2=c2.getContext("2d");x2.fillStyle="#808080";x2.fillRect(0,0,128,128)})}
-    B(4,"ok");
+        B(4,"run");
+        if(shapeEntry){var sb=await zip.file(shapeEntry).async("uint8array");L(4,"Shape.png: "+sb.length+" bytes","g");await drawImg("cv_so",sb);invertCv("cv_so","cv_si");var sc2=document.getElementById("cv_so");L(4,"  "+sc2.width+"x"+sc2.height+"px inverted")}
+        else{L(4,"No Shape.png - fallback circle","w");var c=document.getElementById("cv_so");c.width=c.height=256;var x=c.getContext("2d");x.fillStyle="#000";x.fillRect(0,0,256,256);x.fillStyle="#fff";x.beginPath();x.arc(128,128,112,0,Math.PI*2);x.fill();invertCv("cv_so","cv_si")}
+        if(grainEntry){var gb=await zip.file(grainEntry).async("uint8array");L(4,"Grain.png: "+gb.length+" bytes","g");await drawImg("cv_go",gb);invertCv("cv_go","cv_gi");var gc=document.getElementById("cv_go");L(4,"  "+gc.width+"x"+gc.height+"px inverted")}
+        else{L(4,"No Grain.png","w");["cv_go","cv_gi"].forEach(function(id){var c2=document.getElementById(id);c2.width=c2.height=128;var x2=c2.getContext("2d");x2.fillStyle="#808080";x2.fillRect(0,0,128,128)})}
+        B(4,"ok");
 
-    B(5,"run");var tb=document.getElementById("ptbody"),nD=0,nA=0,nN=0,nU=0;
-    for(var kk in flat){var vv=flat[kk],mm=M[kk],tr=document.createElement("tr");
-      var fv=typeof vv==="number"?vv.toFixed(4):(typeof vv==="string"&&vv.length>40?vv.slice(0,40)+"...":String(vv));
-      if(mm){var cv2=mm.fn(vv);tr.innerHTML="<td>"+kk+"</td><td>"+fv+"</td><td>"+mm.c+" -> "+cv2+"</td><td><span class=\""+(mm.f==="dir"?"dir":mm.f==="apx"?"apx":"non")+"\">"+(mm.f==="dir"?"direct":mm.f==="apx"?"approx":"none")+"</span></td>";if(mm.f==="dir")nD++;else if(mm.f==="apx")nA++;else nN++}
-      else{tr.innerHTML="<td>"+kk+"</td><td>"+fv+"</td><td>-</td><td><span class=\"unk\">unmapped</span></td>";nU++}
-      tb.appendChild(tr)}
-    L(5,"Direct:"+nD+" Approx:"+nA+" None:"+nN+" Unmapped:"+nU,"c");B(5,"ok");
+        B(5,"run");var tb=document.getElementById("ptbody"),nD=0,nA=0,nN=0,nU=0;
+        for(var kk in flat){var vv=flat[kk],mm=M[kk],tr=document.createElement("tr");
+          var fv=typeof vv==="number"?vv.toFixed(4):(typeof vv==="string"&&vv.length>40?vv.slice(0,40)+"...":String(vv));
+        if(mm){var cv2=mm.fn(vv);tr.innerHTML="<td>"+kk+"</td><td>"+fv+"</td><td>"+mm.c+" -> "+cv2+"</td><td><span class=\""+(mm.f==="dir"?"dir":mm.f==="apx"?"apx":"non")+"\">"+(mm.f==="dir"?"direct":mm.f==="apx"?"approx":"none")+"</span></td>";if(mm.f==="dir")nD++;else if(mm.f==="apx")nA++;else nN++}
+        else{tr.innerHTML="<td>"+kk+"</td><td>"+fv+"</td><td>-</td><td><span class=\"unk\">unmapped</span></td>";nU++}
+        tb.appendChild(tr)}
+        L(5,"Direct:"+nD+" Approx:"+nA+" None:"+nN+" Unmapped:"+nU,"c");B(5,"ok");
 
-    B(6,"run");L(6,"Loading sql.js...");
-    var SQL=await initSqlJs({locateFile:function(f){return"https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/"+f}});
-    L(6,"sql.js ready","g");var db=new SQL.Database();
-    db.run("CREATE TABLE Node(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,NodeName TEXT,NodeVariantId INTEGER,NodeInitVariantId INTEGER)");
-    db.run("CREATE TABLE Variant(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,VariantId INTEGER,BrushSize REAL,BrushSizeMin REAL,BrushSizeMax REAL,PaintOpacity REAL,PaintOpacityMin REAL,PaintOpacityMax REAL,BrushDensity REAL,Gap REAL,Stabilization INTEGER,Direction REAL,Thickness REAL,DirectionRange REAL,FlipHorizontal INTEGER,FlipVertical INTEGER,ColorStretch REAL,AmountOfPaint REAL,TextureDensity REAL,TextureScale REAL,SprayDeviation REAL,SprayingEffect INTEGER,ParticleDensity INTEGER,PaintBlendMode INTEGER,AntiAliasing INTEGER,StartingLength REAL,EndingLength REAL,WatercolorEdge REAL,Hardness REAL,BrushTipType INTEGER,DynPressureSize REAL,DynPressureOpacity REAL,DynSpeedSize REAL,DynSpeedOpacity REAL,DynFalloff REAL,DynMix REAL,DynGlaze INTEGER,TaperSize REAL,TaperOpacity REAL,TexMovement REAL,TexZoom REAL,TexRotation REAL,TexFilter INTEGER,BrushSizeMinRatio REAL,BrushSizeMaxRatio REAL,Oriented INTEGER,Stamp INTEGER,BrushInterval REAL,Opacity REAL,BrushFlow REAL,BrushThickness REAL,BrushRotation REAL,BrushHardness REAL,BrushRevision INTEGER,CompositeMode INTEGER,AntiAlias INTEGER,BrushInLength REAL,BrushOutLength REAL,BrushInRatio REAL,BrushOutRatio REAL,BrushMixColor REAL,BrushMixAlpha REAL,BrushSprayDensity INTEGER,BrushUsePatternImage INTEGER,SourceName TEXT)");
-    db.run("CREATE TABLE MaterialFile(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,FileData BLOB)");
-    L(6,"  Tables: Node, Variant(62 cols incl real CSP names), MaterialFile","d");
+        B(6,"run");L(6,"Loading sql.js...");
+        var SQL=await initSqlJs({locateFile:function(f){return"https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/"+f}});
+        L(6,"sql.js ready","g");var db=new SQL.Database();
+        db.run("CREATE TABLE Node(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,NodeName TEXT,NodeVariantId INTEGER,NodeInitVariantId INTEGER)");
+        db.run("CREATE TABLE Variant(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,VariantId INTEGER,BrushSize REAL,BrushSizeMin REAL,BrushSizeMax REAL,PaintOpacity REAL,PaintOpacityMin REAL,PaintOpacityMax REAL,BrushDensity REAL,Gap REAL,Stabilization INTEGER,Direction REAL,Thickness REAL,DirectionRange REAL,FlipHorizontal INTEGER,FlipVertical INTEGER,ColorStretch REAL,AmountOfPaint REAL,TextureDensity REAL,TextureScale REAL,SprayDeviation REAL,SprayingEffect INTEGER,ParticleDensity INTEGER,PaintBlendMode INTEGER,AntiAliasing INTEGER,StartingLength REAL,EndingLength REAL,WatercolorEdge REAL,Hardness REAL,BrushTipType INTEGER,DynPressureSize REAL,DynPressureOpacity REAL,DynSpeedSize REAL,DynSpeedOpacity REAL,DynFalloff REAL,DynMix REAL,DynGlaze INTEGER,TaperSize REAL,TaperOpacity REAL,TexMovement REAL,TexZoom REAL,TexRotation REAL,TexFilter INTEGER,BrushSizeMinRatio REAL,BrushSizeMaxRatio REAL,Oriented INTEGER,Stamp INTEGER,BrushInterval REAL,Opacity REAL,BrushFlow REAL,BrushThickness REAL,BrushRotation REAL,BrushHardness REAL,BrushRevision INTEGER,CompositeMode INTEGER,AntiAlias INTEGER,BrushInLength REAL,BrushOutLength REAL,BrushInRatio REAL,BrushOutRatio REAL,BrushMixColor REAL,BrushMixAlpha REAL,BrushSprayDensity INTEGER,BrushUsePatternImage INTEGER,SourceName TEXT)");
+        db.run("CREATE TABLE MaterialFile(_PW_ID INTEGER PRIMARY KEY AUTOINCREMENT,FileData BLOB)");
+        L(6,"  Tables: Node, Variant(62 cols incl real CSP names), MaterialFile","d");
     // gg: lookup with old+new key fallback
-    var gg=function(){for(var i=0;i<arguments.length;i++){var v=flat[arguments[i]];if(v!==undefined&&v!==null)return v}return undefined};
-    var size=gg("paintSize","brushSize","maximumSize")||20;
-    var sizeMinR=gg("minimumSize","paintSizeMin","minSize")||0.1;
-    var sizeMaxR=gg("maxSize")||1;
-    var vals=[size,sizeMinR*size,Math.max(size,gg("maximumSize","BrushSizeMax")||size*2),
-      (gg("paintOpacity","brushOpacity")||1)*100,
-      (gg("minimumOpacity","paintOpacityMin","minOpacity")||0)*100,
-      (gg("maximumOpacity","maxOpacity")||1)*100,
-      (gg("flow")||1)*100,
-      (gg("spacing","plotSpacing")||0.15)*100,
-      Math.min(100,Math.round(((gg("streamline")||0)+(gg("stabilization")||0))*50)),
-      (gg("shapeRotation")||0)*360,
-      (gg("shapeRoundness")||1)*100,
-      (gg("shapeRandomizedRotation","shapeRandomised","shapeRandomise"))?360:0,
-      gg("shapeFlipX")?1:0, gg("shapeFlipY")?1:0,
-      (gg("wetMixPull","smudgeAmount")||0)*100,
-      (1-(gg("wetMixDilution")||0))*100,
-      (gg("grainDepth")||0)*100,
-      (gg("grainScale","textureScale")||1)*100,
-      (gg("jitter","plotJitter")||0)*100,
-      (gg("jitter","plotJitter")||0)>0.01?1:0,
-      gg("shapeCount")||1, gg("blendMode")||0, 2,
-      (gg("taperSizeBegin","taperStartLength")||0)*100,
-      (gg("taperSizeEnd","taperEndLength")||0)*100,
-      (gg("wetEdges")||0)*100, 80, 1,
-      gg("dynamicsPressureSize","pressureSize")||0,
-      gg("dynamicsPressureOpacity","pressureOpacity")||0,
-      gg("dynamicsSpeedSize","speedSize")||0,
-      gg("dynamicsSpeedOpacity","speedOpacity")||0,
-      gg("dynamicsFalloff","fallOff")||0,
-      gg("dynamicsMix")||0,
-      gg("dynamicsGlaze")?1:0,
-      gg("taperSize")||1, gg("taperOpacity")||1,
-      gg("textureMovement","grainMoving")||0,
-      gg("textureZoom","grainZoom")||0,
-      gg("textureRotation")||0,
-      gg("textureFilter")?1:0,
-      sizeMinR, sizeMaxR,
-      gg("oriented","orientToScreen")?1:0,
-      gg("stamp")?1:0,
+        var gg=function(){for(var i=0;i<arguments.length;i++){var v=flat[arguments[i]];if(v!==undefined&&v!==null)return v}return undefined};
+        var size=gg("paintSize","brushSize","maximumSize")||20;
+        var sizeMinR=gg("minimumSize","paintSizeMin","minSize")||0.1;
+        var sizeMaxR=gg("maxSize")||1;
+        var vals=[size,sizeMinR*size,Math.max(size,gg("maximumSize","BrushSizeMax")||size*2),
+          (gg("paintOpacity","brushOpacity")||1)*100,
+          (gg("minimumOpacity","paintOpacityMin","minOpacity")||0)*100,
+          (gg("maximumOpacity","maxOpacity")||1)*100,
+          (gg("flow")||1)*100,
+          (gg("spacing","plotSpacing")||0.15)*100,
+          Math.min(100,Math.round(((gg("streamline")||0)+(gg("stabilization")||0))*50)),
+          (gg("shapeRotation")||0)*360,
+          (gg("shapeRoundness")||1)*100,
+          (gg("shapeRandomizedRotation","shapeRandomised","shapeRandomise"))?360:0,
+          gg("shapeFlipX")?1:0, gg("shapeFlipY")?1:0,
+          (gg("wetMixPull","smudgeAmount")||0)*100,
+          (1-(gg("wetMixDilution")||0))*100,
+          (gg("grainDepth")||0)*100,
+          (gg("grainScale","textureScale")||1)*100,
+          (gg("jitter","plotJitter")||0)*100,
+          (gg("jitter","plotJitter")||0)>0.01?1:0,
+          gg("shapeCount")||1, gg("blendMode")||0, 2,
+          (gg("taperSizeBegin","taperStartLength")||0)*100,
+          (gg("taperSizeEnd","taperEndLength")||0)*100,
+          (gg("wetEdges")||0)*100, 80, 1,
+          gg("dynamicsPressureSize","pressureSize")||0,
+          gg("dynamicsPressureOpacity","pressureOpacity")||0,
+          gg("dynamicsSpeedSize","speedSize")||0,
+          gg("dynamicsSpeedOpacity","speedOpacity")||0,
+          gg("dynamicsFalloff","fallOff")||0,
+          gg("dynamicsMix")||0,
+          gg("dynamicsGlaze")?1:0,
+          gg("taperSize")||1, gg("taperOpacity")||1,
+          gg("textureMovement","grainMoving")||0,
+          gg("textureZoom","grainZoom")||0,
+          gg("textureRotation")||0,
+          gg("textureFilter")?1:0,
+          sizeMinR, sizeMaxR,
+          gg("oriented","orientToScreen")?1:0,
+          gg("stamp")?1:0,
       // Real CSP column duplicates for compatibility
       (gg("spacing","plotSpacing")||0.15)*100,  // BrushInterval
       (gg("paintOpacity","brushOpacity")||1)*100,  // Opacity
@@ -407,32 +404,32 @@ async function run(file){
       gg("shapeCount")||1,  // BrushSprayDensity
       1,  // BrushUsePatternImage
       bName];
-    var cn="BrushSize,BrushSizeMin,BrushSizeMax,PaintOpacity,PaintOpacityMin,PaintOpacityMax,BrushDensity,Gap,Stabilization,Direction,Thickness,DirectionRange,FlipHorizontal,FlipVertical,ColorStretch,AmountOfPaint,TextureDensity,TextureScale,SprayDeviation,SprayingEffect,ParticleDensity,PaintBlendMode,AntiAliasing,StartingLength,EndingLength,WatercolorEdge,Hardness,BrushTipType,DynPressureSize,DynPressureOpacity,DynSpeedSize,DynSpeedOpacity,DynFalloff,DynMix,DynGlaze,TaperSize,TaperOpacity,TexMovement,TexZoom,TexRotation,TexFilter,BrushSizeMinRatio,BrushSizeMaxRatio,Oriented,Stamp,BrushInterval,Opacity,BrushFlow,BrushThickness,BrushRotation,BrushHardness,BrushRevision,CompositeMode,AntiAlias,BrushInLength,BrushOutLength,BrushInRatio,BrushOutRatio,BrushMixColor,BrushMixAlpha,BrushSprayDensity,BrushUsePatternImage,SourceName";
-    var ph=vals.map(function(){return"?"}).join(",");
-    db.run("INSERT INTO Variant(_PW_ID,VariantId,"+cn+") VALUES(1,1,"+ph+")",vals);
-    db.run("INSERT INTO Variant(_PW_ID,VariantId,"+cn+") VALUES(2,2,"+ph+")",vals);
-    L(6,"  2 Variant rows","g");
-    db.run("INSERT INTO Node VALUES(1,?,1,2)",[bName]);L(6,'  Node: "'+bName+'"',"g");
-    L(6,"\nPacking brush tip TAR...");
-    var tipPng=await cvPng("cv_si");L(6,"  PNG: "+tipPng.length+" bytes");
-    var tar=buildTar("thumbnail/thumbnail.png",tipPng);L(6,"  TAR: "+tar.length+" bytes","d");
-    db.run("INSERT INTO MaterialFile VALUES(1,?)",[tar]);L(6,"  MaterialFile BLOB done","g");
-    var raw2=db.export();sutOut=new Uint8Array(raw2);db.close();
-    L(6,"\n"+Array(49).join("="),"c");L(6,"  .sut ready: "+sutOut.length+" bytes","c");
-    L(6,'  SQLite: "'+String.fromCharCode.apply(null,sutOut.slice(0,15))+'"',"d");
-    L(6,Array(49).join("="),"c");B(6,"ok");
-    document.getElementById("dlBox").classList.add("show");document.getElementById("dlBtn").disabled=false;
-    document.getElementById("dlNote").textContent=bName+".sut - "+(sutOut.length/1024).toFixed(1)+" KB - Import in CSP: File > Import Sub Tool";
-  }catch(e){for(var i2=1;i2<=6;i2++)if(document.getElementById("b"+i2).textContent==="running"){B(i2,"err");L(i2,"\n! "+e.message,"r");break}console.error(e)}
-}
-var dropEl=document.getElementById("drop"),fiEl=document.getElementById("fi"),dfEl=document.getElementById("dropFile");
-dropEl.onclick=function(){fiEl.click()};
-dropEl.ondragover=function(e){e.preventDefault();dropEl.classList.add("over")};
-dropEl.ondragleave=function(){dropEl.classList.remove("over")};
-dropEl.ondrop=function(e){e.preventDefault();dropEl.classList.remove("over");if(e.dataTransfer.files[0])go(e.dataTransfer.files[0])};
-fiEl.onchange=function(e){if(e.target.files[0])go(e.target.files[0])};
-function go(f){dropEl.classList.add("loaded");dfEl.textContent=f.name+" ("+(f.size/1024).toFixed(1)+" KB)";run(f)}
-document.getElementById("dlBtn").onclick=function(){if(!sutOut)return;var b=new Blob([sutOut],{type:"application/octet-stream"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=(dfEl.textContent.split(" (")[0]||"brush").replace(/\.(brush|brushset)$/i,"")+".sut";a.click();URL.revokeObjectURL(a.href)};
+      var cn="BrushSize,BrushSizeMin,BrushSizeMax,PaintOpacity,PaintOpacityMin,PaintOpacityMax,BrushDensity,Gap,Stabilization,Direction,Thickness,DirectionRange,FlipHorizontal,FlipVertical,ColorStretch,AmountOfPaint,TextureDensity,TextureScale,SprayDeviation,SprayingEffect,ParticleDensity,PaintBlendMode,AntiAliasing,StartingLength,EndingLength,WatercolorEdge,Hardness,BrushTipType,DynPressureSize,DynPressureOpacity,DynSpeedSize,DynSpeedOpacity,DynFalloff,DynMix,DynGlaze,TaperSize,TaperOpacity,TexMovement,TexZoom,TexRotation,TexFilter,BrushSizeMinRatio,BrushSizeMaxRatio,Oriented,Stamp,BrushInterval,Opacity,BrushFlow,BrushThickness,BrushRotation,BrushHardness,BrushRevision,CompositeMode,AntiAlias,BrushInLength,BrushOutLength,BrushInRatio,BrushOutRatio,BrushMixColor,BrushMixAlpha,BrushSprayDensity,BrushUsePatternImage,SourceName";
+      var ph=vals.map(function(){return"?"}).join(",");
+      db.run("INSERT INTO Variant(_PW_ID,VariantId,"+cn+") VALUES(1,1,"+ph+")",vals);
+      db.run("INSERT INTO Variant(_PW_ID,VariantId,"+cn+") VALUES(2,2,"+ph+")",vals);
+      L(6,"  2 Variant rows","g");
+      db.run("INSERT INTO Node VALUES(1,?,1,2)",[bName]);L(6,'  Node: "'+bName+'"',"g");
+      L(6,"\nPacking brush tip TAR...");
+      var tipPng=await cvPng("cv_si");L(6,"  PNG: "+tipPng.length+" bytes");
+      var tar=buildTar("thumbnail/thumbnail.png",tipPng);L(6,"  TAR: "+tar.length+" bytes","d");
+      db.run("INSERT INTO MaterialFile VALUES(1,?)",[tar]);L(6,"  MaterialFile BLOB done","g");
+      var raw2=db.export();sutOut=new Uint8Array(raw2);db.close();
+      L(6,"\n"+Array(49).join("="),"c");L(6,"  .sut ready: "+sutOut.length+" bytes","c");
+      L(6,'  SQLite: "'+String.fromCharCode.apply(null,sutOut.slice(0,15))+'"',"d");
+      L(6,Array(49).join("="),"c");B(6,"ok");
+      document.getElementById("dlBox").classList.add("show");document.getElementById("dlBtn").disabled=false;
+      document.getElementById("dlNote").textContent=bName+".sut - "+(sutOut.length/1024).toFixed(1)+" KB - Import in CSP: File > Import Sub Tool";
+    }catch(e){for(var i2=1;i2<=6;i2++)if(document.getElementById("b"+i2).textContent==="running"){B(i2,"err");L(i2,"\n! "+e.message,"r");break}console.error(e)}
+  }
+  var dropEl=document.getElementById("drop"),fiEl=document.getElementById("fi"),dfEl=document.getElementById("dropFile");
+  dropEl.onclick=function(){fiEl.click()};
+  dropEl.ondragover=function(e){e.preventDefault();dropEl.classList.add("over")};
+  dropEl.ondragleave=function(){dropEl.classList.remove("over")};
+  dropEl.ondrop=function(e){e.preventDefault();dropEl.classList.remove("over");if(e.dataTransfer.files[0])go(e.dataTransfer.files[0])};
+  fiEl.onchange=function(e){if(e.target.files[0])go(e.target.files[0])};
+  function go(f){dropEl.classList.add("loaded");dfEl.textContent=f.name+" ("+(f.size/1024).toFixed(1)+" KB)";run(f)}
+  document.getElementById("dlBtn").onclick=function(){if(!sutOut)return;var b=new Blob([sutOut],{type:"application/octet-stream"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=(dfEl.textContent.split(" (")[0]||"brush").replace(/\.(brush|brushset)$/i,"")+".sut";a.click();URL.revokeObjectURL(a.href)};
 </script>
 </body>
 </html>
