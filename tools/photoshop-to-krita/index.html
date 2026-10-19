@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photoshop to Krita Brush Converter</title>
+  <link rel="stylesheet" href="../../assets/fonts.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script src="../../vendor/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="to-krita">
+  <div class="wrap">
+    <nav class="crumbs" id="nav" aria-label="Converters"><a class="home" href="../../">Brush Converters</a></nav>
+    <header>
+      <p class="kicker">Brush converter</p>
+      <h1><span class="c-photoshop">Photoshop</span><span class="to">→</span><span class="c-krita">Krita</span></h1>
+      <p class="subtitle">Turn Photoshop brushes into one Krita resource bundle. Each preset keeps its name, tip and texture, along with size, angle and roundness dynamics, scattering, the dual brush, transfer and colour jitter.</p>
+      <p class="subtitle">Krita can open <code>.abr</code> files itself, but it only keeps the tip images.</p>
+    </header>
+
+    <div class="opts">
+      <label>Bundle name <input id="optName" placeholder="Photoshop Brushes" autocomplete="off"></label>
+      <label>Author <input id="optAuthor" placeholder="optional" autocomplete="off"></label>
+      <label>Max tip size
+        <select id="optTip" title="Larger keeps more detail in big brushes; smaller makes the bundle lighter"><option value="512">512 px</option><option value="1024" selected>1024 px</option><option value="2048">2048 px</option></select>
+      </label>
+    </div>
+
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose .abr files">
+      <div class="drop-title">Drop your Photoshop brushes here</div>
+      <div class="drop-hint">or click to choose. Everything goes into one Krita bundle.</div>
+      <div class="drop-accepts"><span class="fmt photoshop"><code>.abr</code></span><span class="fmt photoshop"><code>.zip</code> pack</span></div>
+      <div class="drop-file" id="dropFile"></div>
+      <input type="file" id="fi" accept=".abr,.zip" multiple>
+    </div>
+
+    <div class="pipeline-title"><h2>How it’s converted</h2><span>each step explains what it does</span></div>
+    <div class="pipeline">
+      <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">Read Brushes</span><span class="stg-badge wait" id="b1">pending</span></div>
+      <div class="stg-body"><div class="stg-info">An <code>.abr</code> from Photoshop 7 or later is a series of tagged <strong>sections</strong>:
+        <ul>
+          <li><code>samp</code> holds the tip images and <code>patt</code> the patterns.</li>
+          <li><code>desc</code> holds every preset's settings as an <strong>action descriptor</strong>, Photoshop's own typed key-value format.</li>
+          <li>Newer files add <code>phry</code>, the folders of the Brushes panel.</li>
+        </ul>
+        Files from Photoshop 6 and earlier are a plain list of tips, each with a size and spacing.</div><div class="log" id="o1"></div></div></div>
+
+      <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Decode Tips &amp; Patterns</span><span class="stg-badge wait" id="b2">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A tip image is an 8- or 16-bit grayscale <strong>coverage mask</strong>, usually compressed row by row with PackBits run-length encoding. 255 means full paint, so it becomes a Krita alpha mask as it is. Patterns are stored the same way, one colour channel at a time.</div>
+      <div class="tex-row" id="mats"></div><div class="log" id="o2"></div></div></div>
+
+      <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">Map Parameters</span><span class="stg-badge wait" id="b3">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Settings map onto Krita's <strong>Pixel brush</strong>:
+        <ul>
+          <li>Each Photoshop control (pen pressure, fade, tilt, direction…) becomes a Krita sensor, and jitter becomes a Random sensor.</li>
+          <li>Scattering becomes Scatter. Count is imitated with tighter spacing.</li>
+          <li>The texture keeps its mode, since Krita 5 has Photoshop's height and burn modes. The dual brush becomes Krita's masking brush.</li>
+          <li>Transfer becomes Opacity and Flow sensors. Colour jitter becomes the Mix and H/S/V options.</li>
+        </ul>
+        Bristle and erodible tips, wet edges and noise have no Krita equivalent and are listed per brush.</div><div class="log" id="o3"></div></div></div>
+
+      <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Write Presets</span><span class="stg-badge wait" id="b4">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A <code>.kpp</code> preset is a <strong>PNG thumbnail</strong> with the preset XML in a text chunk. The thumbnails below are sample strokes drawn with the converted settings.</div>
+      <div class="brush-grid" id="cards"></div><div class="log" id="o4"></div></div></div>
+
+      <div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">Bundle</span><span class="stg-badge wait" id="b5">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A Krita <code>.bundle</code> is a zip. It holds an uncompressed <code>mimetype</code>, a manifest with an <strong>MD5 for every file</strong>, the presets, the tips (<code>brushes/</code>) and the textures (<code>patterns/</code>). The presets are tagged with the bundle name, and with their Photoshop folder when they're in one.</div><div class="log" id="o5"></div></div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { browserImaging, imageToCanvas, maskToCanvas } from '../../lib/image.js';
+    import { writeBundle } from '../../lib/krita/bundle.js';
+    import { photoshopToKrita } from '../../lib/krita/from-photoshop.js';
+    import { kppBytes } from '../../lib/krita/kpp.js';
+    import { ResourcePool, slug } from '../../lib/krita/preset.js';
+    import { renderNav } from '../../lib/nav.js';
+    import { readAbrFiles } from '../../lib/photoshop/abr.js';
+    import { badge, brushCard, detailsAction, download, failRunning, formatSize, imageCard, latestOnly, log, progress, readFiles, resetStages, setResult, setupDrop, uniqueNamer } from '../../lib/ui.js';
+
+    renderNav('photoshop', 'krita');
+    const STAGES = 5;
+    const MAX_PREVIEWS = 24;
+    const TIP_KINDS = { computed: 'round tip', sampled: 'image tip', bristle: 'bristle tip', erodible: 'erodible tip' };
+    const state = { files: null, presets: null, resources: null, failed: 0, warned: 0, output: null };
+
+    const bundleName = () => document.getElementById('optName').value.trim()
+      || (state.files && state.files.length === 1 ? state.files[0].name.replace(/\.(abr|zip)$/i, '') : 'Photoshop Brushes');
+
+    async function makeBundle() {
+      const name = bundleName();
+      const author = document.getElementById('optAuthor').value.trim();
+      badge(5, 'run');
+      document.getElementById('o5').replaceChildren();
+      for (const r of state.resources) log(5, `${r.kind}/${r.filename}  ${formatSize(r.data.length)}`, 'd');
+      const folders = new Set(state.presets.flatMap((p) => p.tags));
+      if (folders.size) log(5, `tags: ${[name, ...folders].join(', ')}`, 'l');
+      const blob = await writeBundle(window.JSZip, state.presets, state.resources, {
+        name, author, tag: name,
+        description: `Converted from Photoshop with brush-converters (${state.presets.length} brushes)`,
+      });
+      state.output = { blob, filename: `${slug(name)}.bundle` };
+      log(5, `\n${state.output.filename}: ${state.presets.length} presets, ${state.resources.length} resources, ${formatSize(blob.size)}`, 'c');
+      badge(5, 'ok');
+      const { warned, failed } = state;
+      setResult({
+        state: 'ok',
+        title: `${state.presets.length} brush${state.presets.length === 1 ? '' : 'es'} → ${state.output.filename} (${formatSize(blob.size)})`,
+        detail: 'In Krita: Settings → Manage Resources → Import Resources. The presets are tagged with the bundle name.'
+          + (warned ? ` ${warned} brush${warned === 1 ? ' has' : 'es have'} settings Krita can't reproduce — see step 04.` : '')
+          + (failed ? ` ${failed} item(s) failed — see the steps below.` : ''),
+        actions: [{ label: 'Download .bundle', primary: true, onClick: () => download(state.output.blob, state.output.filename) }, detailsAction],
+      });
+    }
+
+    async function run(files) {
+      Object.assign(state, { files, output: null, presets: null });
+      document.getElementById('mats').replaceChildren();
+      document.getElementById('cards').replaceChildren();
+      resetStages(STAGES, `Converting ${files.length} file${files.length === 1 ? '' : 's'}…`);
+      const maxTip = Number(document.getElementById('optTip').value);
+      try {
+        // 1. Read
+        badge(1, 'run');
+        const { brushes, files: read, errors } = await readAbrFiles(window.JSZip, await readFiles(files), (i, n) => progress(1, i, n));
+        let failed = errors.length;
+        for (const e of errors) log(1, `! ${e}`, 'r');
+        for (const f of read) {
+          log(1, `${f.name}: version ${f.version}, ${f.count} brush${f.count === 1 ? '' : 'es'}`, 'c');
+          for (const w of f.warnings) log(1, `   - ${w}`, 'w');
+        }
+        for (const b of brushes) log(1, `${b.group ? `${b.group} / ` : ''}${b.name}  (${TIP_KINDS[b.tip.kind] || b.tip.kind}, ${Math.round(b.tip.size)} px)`, 'g');
+        if (!brushes.length) throw new Error(files.length ? 'no Photoshop brushes found in what was dropped' : 'nothing to convert');
+        log(1, `\n${brushes.length} brush(es)`, 'c');
+        badge(1, 'ok');
+
+        // 2. Tips and patterns, each shown once however many presets share it.
+        badge(2, 'run');
+        const mats = document.getElementById('mats');
+        const tips = new Map(), patterns = new Map();
+        for (const b of brushes) {
+          for (const t of [b.tip, b.dual && b.dual.tip]) if (t && t.mask && !tips.has(t.mask)) tips.set(t.mask, b.name);
+          if (b.texture && b.texture.image && !patterns.has(b.texture.image)) patterns.set(b.texture.image, b.texture.name);
+        }
+        let previews = 0;
+        for (const [mask, name] of tips) {
+          log(2, `tip ${mask.width}×${mask.height}  (${name})`, 'g');
+          if (previews++ < MAX_PREVIEWS) mats.append(imageCard(maskToCanvas(mask), 'tip', name));
+        }
+        for (const [image, name] of patterns) {
+          log(2, `pattern '${name}' ${image.width}×${image.height}`, 'g');
+          if (previews++ < MAX_PREVIEWS) mats.append(imageCard(imageToCanvas(image), 'pattern', name, false));
+        }
+        if (!previews) log(2, 'no tip images or patterns: every brush has a round tip', 'd');
+        if (previews > MAX_PREVIEWS) log(2, `(showing the first ${MAX_PREVIEWS} of ${previews} images)`, 'd');
+        badge(2, 'ok');
+
+        // 3. Mapping
+        badge(3, 'run');
+        const pool = new ResourcePool();
+        const presets = [];
+        for (const [i, b] of brushes.entries()) {
+          progress(3, i + 1, brushes.length);
+          try {
+            const preset = await photoshopToKrita(b, pool, browserImaging, maxTip);
+            presets.push(preset);
+            log(3, `ok ${preset.name}: ${Math.round(b.tip.size)} px, ${preset.mapped.join(', ')}`, 'g');
+            for (const w of preset.warnings) log(3, `   - ${w}`, 'w');
+          } catch (e) {
+            console.error(e);
+            log(3, `! ${b.name}: ${e.message}`, 'r');
+            failed++;
+          }
+        }
+        if (!presets.length) throw new Error('nothing could be converted');
+        log(3, `\n${presets.length} preset(s), ${pool.resources.length} tip/texture file(s)`, 'c');
+        badge(3, 'ok');
+
+        // 4. Presets
+        badge(4, 'run');
+        const written = [];
+        const name = uniqueNamer();
+        const cards = document.getElementById('cards');
+        for (const [i, preset] of presets.entries()) {
+          progress(4, i + 1, presets.length);
+          const { data, thumbnail } = await kppBytes(preset);
+          const filename = name(slug(preset.name), '.kpp');
+          written.push({ filename, data, thumbnail, tags: preset.tags });
+          cards.append(brushCard({ ...preset, filename, thumbnail }));
+          log(4, `paintoppresets/${filename}  ${formatSize(data.length)}`, 'd');
+        }
+        badge(4, 'ok');
+
+        Object.assign(state, { presets: written, resources: pool.resources, failed, warned: presets.filter((p) => p.warnings.length).length });
+        await makeBundle();
+      } catch (e) {
+        state.presets = null;
+        failRunning(STAGES, e, 'Drop Photoshop .abr brush files, or a .zip of them.');
+      }
+    }
+
+    const convert = latestOnly(run);
+    const rebundle = latestOnly(() => (state.presets ? makeBundle() : null));
+    setupDrop({ accept: ['.abr', '.zip'], onFiles: convert });
+    for (const id of ['optName', 'optAuthor']) {
+      document.getElementById(id).addEventListener('change', () => rebundle().catch((e) => failRunning(STAGES, e)));
+    }
+    document.getElementById('optTip').addEventListener('change', () => { if (state.files) convert(state.files); });
+  </script>
+</body>
+</html>

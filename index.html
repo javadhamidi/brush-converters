@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Brush Converters</title>
-  <meta name="description" content="Move brushes between Procreate, Clip Studio Paint and Krita, right in your browser.">
+  <meta name="description" content="Move brushes between Procreate, Clip Studio Paint and Krita, and bring Photoshop brushes into Krita, right in your browser.">
   <link rel="stylesheet" href="assets/fonts.css">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="to-krita">
   <div class="wrap">
     <header>
-      <p class="kicker"><span class="c-procreate">Procreate</span> · <span class="c-csp">Clip Studio Paint</span> · <span class="c-krita">Krita</span></p>
+      <p class="kicker"><span class="c-procreate">Procreate</span> · <span class="c-csp">Clip Studio Paint</span> · <span class="c-krita">Krita</span> · <span class="c-photoshop">Photoshop</span></p>
       <h1>Move your brushes between painting apps</h1>
-      <p class="subtitle">Convert brushes between any two of the three apps. Drop in a brush file and get one the other app can import: tips, textures, pressure curves and all. Everything happens in your browser, and your files never leave your computer.</p>
+      <p class="subtitle">Convert brushes between any two of Procreate, Clip Studio Paint and Krita, and bring Photoshop brushes into Krita. Drop in a brush file and get one the other app can import: tips, textures, pressure curves and all. Everything happens in your browser, and your files never leave your computer.</p>
     </header>
 
     <nav class="routes" aria-label="Converters">
@@ -92,6 +92,21 @@
         </a>
         </div>
       </section>
+      <section class="route-group" aria-labelledby="from-photoshop">
+        <h2 id="from-photoshop"><span class="from">From</span> <span class="c-photoshop">Photoshop</span></h2>
+        <div class="route-pair">
+        <a class="route to-krita" href="tools/photoshop-to-krita/">
+          <span class="route-line">
+            <span class="fmt photoshop"><span class="app">Photoshop</span> <code>.abr</code></span>
+            <span class="arrow" aria-hidden="true">→</span>
+            <span class="fmt krita"><span class="app">Krita</span> <code>.bundle</code></span>
+          </span>
+          <span class="route-title">To Krita <span class="tag ok">tested in Krita 5.3 &amp; 6.0</span></span>
+          <span class="route-desc">Brush files from any Photoshop version, or a <code>.zip</code> pack of them, become one Krita bundle. Tips and textures come across at full resolution, along with size, angle and roundness dynamics, scattering, dual brushes, colour jitter, and the brush folders as tags.</span>
+          <span class="route-go">Convert to Krita →</span>
+        </a>
+        </div>
+      </section>
     </nav>
 
     <h2>What's inside each format</h2>
@@ -108,8 +123,12 @@
         <h3>Krita <code>.bundle</code></h3>
         <p>A ZIP with a checksum manifest. Each preset is a PNG thumbnail with the settings hidden in a text chunk, next to its tips and textures.</p>
       </section>
+      <section class="format photoshop">
+        <h3>Photoshop <code>.abr</code></h3>
+        <p>Tagged binary sections: the tip images, the patterns, and every preset's settings in Photoshop's own key-value "descriptor" format. Files from Photoshop 6 and earlier are a plain list of tips.</p>
+      </section>
     </div>
-    <p class="note">The three apps paint with different brush engines, so no conversion is exact. Each converter lists the settings it couldn't carry over, so you know what to tweak.</p>
+    <p class="note">The apps paint with different brush engines, so no conversion is exact. Each converter lists the settings it couldn't carry over, so you know what to tweak.</p>
 
     <footer>Conversions run entirely on this page. Nothing is uploaded.</footer>
   </div>

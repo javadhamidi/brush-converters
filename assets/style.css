@@ -1,6 +1,6 @@
 /* Shared theme for the brush converters.
  * Each painting app has its own colour, used wherever that app appears:
- * Clip Studio Paint = coral, Procreate = teal, Krita = violet. A converter page
+ * Clip Studio Paint = coral, Procreate = teal, Krita = violet, Photoshop = blue. A converter page
  * takes the colour of the app it converts *to* (body.to-csp / to-procreate / to-krita). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -8,7 +8,7 @@
   --void: #100e0c; --deep: #15120f; --surf: #1b1814; --raised: #221e19; --card: #29241e;
   --rule: #2f2a23; --rule-hi: #463d32;
   --t1: #efe7da; --t2: #c3b8a8; --t3: #9a8f80;
-  --csp: #ff8f6b; --procreate: #4fd6c4; --krita: #b9a2ff;
+  --csp: #ff8f6b; --procreate: #4fd6c4; --krita: #b9a2ff; --photoshop: #5aaeff;
   --ok: #7fd49b; --warn: #f0c25a; --err: #ff6b6b; --code: #a6c8ff; --num: #a6c8ff;
   --accent: var(--krita);
   --mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -18,7 +18,7 @@
 body.to-csp { --accent: var(--csp); }
 body.to-procreate { --accent: var(--procreate); }
 body.to-krita { --accent: var(--krita); }
-.c-csp { color: var(--csp); } .c-procreate { color: var(--procreate); } .c-krita { color: var(--krita); }
+.c-csp { color: var(--csp); } .c-procreate { color: var(--procreate); } .c-krita { color: var(--krita); } .c-photoshop { color: var(--photoshop); }
 .c-ok { color: var(--ok); } .c-err { color: var(--err); } .warn { color: var(--warn); }
 
 html { font-size: 15px; }
@@ -47,7 +47,7 @@ code { font-family: var(--mono); }
 .crumbs .sw-app { padding: .2rem .6rem; border-radius: 999px; border: 1px solid var(--rule); color: var(--t2); }
 .crumbs .sw-app:hover { color: var(--t1); border-color: var(--rule-hi); }
 .crumbs .sw-app[aria-current] { color: var(--c); border-color: color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
-.sw-app.c-csp { --c: var(--csp); } .sw-app.c-procreate { --c: var(--procreate); } .sw-app.c-krita { --c: var(--krita); }
+.sw-app.c-csp { --c: var(--csp); } .sw-app.c-procreate { --c: var(--procreate); } .sw-app.c-krita { --c: var(--krita); } .sw-app.c-photoshop { --c: var(--photoshop); }
 
 /* Headings */
 header { margin-bottom: 2.25rem; }
@@ -65,7 +65,7 @@ h2 { font-family: var(--display); font-size: 1.35rem; font-weight: 600; color: v
 .fmt { --c: var(--t2); display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .65rem; border-radius: 999px; font-size: .72rem; color: var(--t1); white-space: nowrap;
   background: color-mix(in srgb, var(--c) 12%, var(--surf)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
 .fmt code { color: var(--c); font-size: .95em; }
-.fmt.csp { --c: var(--csp); } .fmt.procreate { --c: var(--procreate); } .fmt.krita { --c: var(--krita); }
+.fmt.csp { --c: var(--csp); } .fmt.procreate { --c: var(--procreate); } .fmt.krita { --c: var(--krita); } .fmt.photoshop { --c: var(--photoshop); }
 
 /* Drop zone: a blank canvas */
 .drop { position: relative; border: 1.5px dashed var(--rule-hi); border-radius: 14px; padding: 2.25rem 1.25rem 2rem; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 1.25rem;
@@ -185,6 +185,7 @@ table.ptbl { width: 100%; border-collapse: collapse; font-size: .7rem; }
 .route-group h2 .from { font-family: var(--mono); font-size: .68rem; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
 .route-pair { display: grid; gap: .8rem; }
 @media (min-width: 700px) { .route-pair { grid-template-columns: 1fr 1fr; } }
+.route-pair > .route:only-child { grid-column: 1 / -1; }
 /* The group heading names the source app, so its chip only shows the file types. */
 .route-pair .route-line .fmt:first-child .app { display: none; }
 .route { display: block; padding: 1.2rem 1.25rem 1.25rem; border-radius: 14px; background: var(--surf); border: 1px solid var(--rule); color: var(--t2); text-decoration: none; transition: border-color .2s, transform .2s, background .2s; }
@@ -206,9 +207,9 @@ table.ptbl { width: 100%; border-collapse: collapse; font-size: .7rem; }
 .tag.exp { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
 
 /* Landing: one column per file format */
-.formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
 .format { padding: 1rem 1.1rem 1.1rem; border-radius: 12px; background: var(--surf); border: 1px solid var(--rule); border-top: 3px solid var(--c); }
-.format.csp { --c: var(--csp); } .format.procreate { --c: var(--procreate); } .format.krita { --c: var(--krita); }
+.format.csp { --c: var(--csp); } .format.procreate { --c: var(--procreate); } .format.krita { --c: var(--krita); } .format.photoshop { --c: var(--photoshop); }
 .format h3 { font-family: var(--display); font-size: 1.05rem; font-weight: 600; color: var(--t1); display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .55rem; }
 .format h3 code { font-size: .74rem; font-weight: 400; color: var(--c); }
 .format p { font-family: var(--serif); font-size: .9rem; color: var(--t2); line-height: 1.6; }
