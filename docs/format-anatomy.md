@@ -1,7 +1,5 @@
-> [!WARNING]
-> **AI disclosure:** This is entirely slop and none of the literature or code has been reviewed for technical accuracy.
-
----
+> [!NOTE]
+> Superseded in part by [csp-internals.md](csp-internals.md): CSP's effector format and `.layer` material pixels have since been decoded. Where this document calls them undocumented, or says the brush tip is `thumbnail.png`, read `csp-internals.md` instead.
 
 # Deep Technical Anatomy of Procreate and CSP Brush Formats: Building a Cross-Format Converter
 

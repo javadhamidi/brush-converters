@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Krita to Clip Studio Paint Brush Converter</title>
+  <link rel="stylesheet" href="../../assets/fonts.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script src="../../vendor/jszip/3.10.1/jszip.min.js"></script>
+  <script src="../../vendor/sql.js/1.8.0/sql-wasm.js"></script>
+</head>
+<body class="to-csp">
+  <div class="wrap">
+    <nav class="crumbs" id="nav" aria-label="Converters"><a class="home" href="../../">Brush Converters</a></nav>
+    <header>
+      <p class="kicker">Brush converter</p>
+      <h1><span class="c-krita">Krita</span><span class="to">→</span><span class="c-csp">Clip Studio Paint</span></h1>
+      <p class="subtitle">Turn Krita presets into Clip Studio Paint sub tools, one <code>.sut</code> per preset. It carries over the tip, size, opacity, spacing, pressure, rotation and scatter.</p>
+      <p class="subtitle"><strong class="warn">Experimental:</strong> Clip Studio keeps tips in an encrypted layer format that can be read but not written, so the tip goes in as a plain image. These files aren't yet confirmed to import in Clip Studio Paint.</p>
+    </header>
+
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a .bundle, .kpp presets or a .zip">
+      <div class="drop-title">Drop your Krita brushes here</div>
+      <div class="drop-hint">or click to choose. Loose <code>.kpp</code> presets can come with their tip and pattern files.</div>
+      <div class="drop-accepts"><span class="fmt krita"><code>.bundle</code></span><span class="fmt krita"><code>.kpp</code></span><span class="fmt krita"><code>.zip</code></span><span class="fmt krita">tips</span></div>
+      <div class="drop-file" id="dropFile"></div>
+      <input type="file" id="fi" accept=".bundle,.kpp,.zip,.png,.gbr,.gih,.svg,.pat" multiple>
+    </div>
+
+    <div class="pipeline-title"><h2>How it’s converted</h2><span>each step explains what it does</span></div>
+    <div class="pipeline">
+      <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">Read Presets</span><span class="stg-badge wait" id="b1">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A Krita <code>.bundle</code> is a ZIP of presets, tips and patterns. Each <code>.kpp</code> preset is a <strong>PNG</strong> whose <code>preset</code> text chunk (often <strong>zlib-compressed</strong>) holds the settings as XML. Filter, clone and other engines that edit pixels instead of painting are skipped.</div><div class="log" id="o1"></div></div></div>
+
+      <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Load Tips</span><span class="stg-badge wait" id="b2">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Generated tips are drawn from their settings. Image tips are read from PNG, SVG and GIMP <code>.gbr</code> / <code>.gih</code> files. CSP draws with <strong>dark ink</strong>, so each tip is stored <strong>dark on white</strong>.</div>
+      <div class="tex-row" id="mats"></div><div class="log" id="o2"></div></div></div>
+
+      <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">Map Settings</span><span class="stg-badge wait" id="b3">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Krita's <strong>sensor curves</strong> are reduced to pressure and speed amounts, rotation (follow stroke or random), roundness, scatter and texture strength. These go through the same mapping as the Procreate → CSP converter.</div><div class="log" id="o3"></div></div></div>
+
+      <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Write .sut</span><span class="stg-badge wait" id="b4">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A CSP <code>.sut</code> is a <strong>SQLite 3 database</strong> with three tables. <code>Node</code> holds the name, <code>Variant</code> holds the settings as typed columns, and <code>MaterialFile</code> holds the tip as a <strong>tar archive</strong> containing <code>thumbnail/thumbnail.png</code>. It's built with <strong>sql.js</strong> (SQLite compiled to WebAssembly). Several presets are downloaded together as a <code>.zip</code>.</div><div class="log" id="o4"></div></div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { writeSut } from '../../lib/csp/write.js';
+    import { decodeImage, decodeSvg, fitMask, maskToCanvas } from '../../lib/image.js';
+    import { slug } from '../../lib/krita/preset.js';
+    import { readKritaFiles } from '../../lib/krita/read.js';
+    import { renderNav } from '../../lib/nav.js';
+    import { padSquare } from '../../lib/pixels.js';
+    import { kritaToSettings } from '../../lib/procreate/from-krita.js';
+    import { badge, detailsAction, download, failRunning, formatSize, imageCard, latestOnly, loadSql, log, progress, readFiles, resetStages, setResult, setupDrop, uniqueNamer } from '../../lib/ui.js';
+
+    renderNav('krita', 'csp');
+    const STAGES = 4;
+    const MAX_PREVIEWS = 24;
+    const MAX_TIP = 1024;
+    let out = null;
+
+    async function run(files) {
+      out = null;
+      document.getElementById('mats').replaceChildren();
+      resetStages(STAGES, `Converting ${files.length} file${files.length === 1 ? '' : 's'}…`);
+      try {
+        // 1. Presets
+        badge(1, 'run');
+        const read = await readKritaFiles(window.JSZip, await readFiles(files), { decodeImage, decodeSvg }, (i, n) => progress(1, i, n));
+        let failed = read.errors.length + read.skipped.length;
+        if (read.name) log(1, `Bundle: ${read.name}`, 'c');
+        for (const e of read.errors) log(1, `! ${e}`, 'r');
+        for (const s of read.skipped) log(1, `skipped ${s.name}: ${s.reason}`, 'w');
+        log(1, `${read.presets.length} preset(s)`, read.presets.length ? 'g' : 'r');
+        if (!read.presets.length) throw new Error(read.errors[0] || 'no Krita presets found in what was dropped');
+        badge(1, 'ok');
+
+        // 2. Tips
+        badge(2, 'run');
+        const mats = document.getElementById('mats');
+        let previews = 0;
+        for (const p of read.presets) {
+          log(2, `${p.name}: ${p.tipLabel}`, p.tips ? 'g' : 'd');
+          if (p.tips && previews++ < MAX_PREVIEWS) mats.append(imageCard(maskToCanvas(fitMask(p.tips.masks[0], 256)), 'tip', p.name));
+        }
+        if (previews > MAX_PREVIEWS) log(2, `(showing the first ${MAX_PREVIEWS} of ${previews} tips)`, 'd');
+        badge(2, 'ok');
+
+        // 3. Settings
+        badge(3, 'run');
+        const mapped = [];
+        for (const [i, p] of read.presets.entries()) {
+          progress(3, i + 1, read.presets.length);
+          try {
+            const r = kritaToSettings(p);
+            if (r.grain) r.warnings.push('texture not carried over: only the tip image can be stored');
+            mapped.push(r);
+            log(3, `ok ${p.name}: ${Math.round(r.settings.size)} px, ${r.mapped.join(', ')}`, 'g');
+            for (const w of r.warnings) log(3, `   - ${w}`, 'w');
+          } catch (e) {
+            console.error(e);
+            log(3, `! ${p.name}: ${e.message}`, 'r');
+            failed++;
+          }
+        }
+        if (!mapped.length) throw new Error('nothing could be converted');
+        badge(3, 'ok');
+
+        // 4. .sut files
+        badge(4, 'run');
+        log(4, 'Loading sql.js (WebAssembly)…', 'd');
+        const SQL = await loadSql();
+        const name = uniqueNamer();
+        const suts = [];
+        for (const [i, m] of mapped.entries()) {
+          progress(4, i + 1, mapped.length);
+          const tip = fitMask(padSquare(m.shape), MAX_TIP, 'gray');
+          const data = await writeSut(SQL, m.settings, tip);
+          const filename = name(slug(m.settings.name), '.sut');
+          suts.push({ filename, data });
+          log(4, `${filename}  ${formatSize(data.length)}`, 'd');
+        }
+        if (suts.length === 1) out = { blob: new Blob([suts[0].data], { type: 'application/octet-stream' }), filename: suts[0].filename };
+        else {
+          const zip = new window.JSZip();
+          for (const s of suts) zip.file(s.filename, s.data);
+          const stem = slug(read.name || 'Krita Brushes');
+          out = { blob: await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }), filename: `${stem} (CSP).zip` };
+        }
+        log(4, `\n${out.filename}: ${formatSize(out.blob.size)}`, 'c');
+        badge(4, 'ok');
+        const warned = mapped.filter((m) => m.warnings.length).length;
+        setResult({
+          state: 'ok',
+          title: `${suts.length} preset${suts.length === 1 ? '' : 's'} → ${out.filename} (${formatSize(out.blob.size)})`,
+          detail: `Import in CSP: File → Import Sub Tool${suts.length > 1 ? ', one .sut at a time (unzip first)' : ''}. Experimental: the tip is stored as an image, and CSP may not accept the file.`
+            + (warned ? ` ${warned} preset${warned === 1 ? ' has' : 's have'} settings that couldn't be carried over — see step 03.` : '')
+            + (failed ? ` ${failed} item(s) failed or were skipped — see step 01.` : ''),
+          actions: [{ label: `Download ${suts.length === 1 ? '.sut' : '.zip'}`, primary: true, onClick: () => download(out.blob, out.filename) }, detailsAction],
+        });
+      } catch (e) {
+        failRunning(STAGES, e, 'Drop a Krita .bundle, .kpp presets (with their tip files), or a .zip of them.');
+      }
+    }
+
+    setupDrop({ accept: ['.bundle', '.kpp', '.zip', '.png', '.gbr', '.gih', '.svg', '.pat'], onFiles: latestOnly(run) });
+  </script>
+</body>
+</html>

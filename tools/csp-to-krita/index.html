@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSP to Krita Brush Converter</title>
+  <link rel="stylesheet" href="../../assets/fonts.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script src="../../vendor/jszip/3.10.1/jszip.min.js"></script>
+  <script src="../../vendor/sql.js/1.8.0/sql-wasm.js"></script>
+</head>
+<body class="to-krita">
+  <div class="wrap">
+    <nav class="crumbs" id="nav" aria-label="Converters"><a class="home" href="../../">Brush Converters</a></nav>
+    <header>
+      <p class="kicker">Brush converter</p>
+      <h1><span class="c-csp">Clip Studio Paint</span><span class="to">→</span><span class="c-krita">Krita</span></h1>
+      <p class="subtitle">Turn Clip Studio Paint sub tools into a Krita resource bundle you can import in one go. Tips and paper textures come across at full resolution, along with pressure curves, spacing, rotation, scatter and dual brushes.</p>
+    </header>
+
+    <div class="opts">
+      <label>Bundle name <input id="optName" placeholder="CSP Brushes" autocomplete="off"></label>
+      <label>Author <input id="optAuthor" placeholder="optional" autocomplete="off"></label>
+      <label>Max tip size
+        <select id="optTip" title="Larger keeps more detail in big brushes; smaller makes the bundle lighter"><option value="512">512 px</option><option value="1024" selected>1024 px</option><option value="2048">2048 px</option></select>
+      </label>
+    </div>
+
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose .sut files or a .zip brush pack">
+      <div class="drop-title">Drop your Clip Studio brushes here</div>
+      <div class="drop-hint">or click to choose. Everything goes into one Krita bundle.</div>
+      <div class="drop-accepts"><span class="fmt csp"><code>.sut</code></span><span class="fmt csp"><code>.zip</code> pack</span><span class="fmt csp">folder</span></div>
+      <div class="drop-file" id="dropFile"></div>
+      <input type="file" id="fi" accept=".sut,.zip" multiple>
+    </div>
+
+    <div class="pipeline-title"><h2>How it’s converted</h2><span>each step explains what it does</span></div>
+    <div class="pipeline">
+      <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">Read SQLite</span><span class="stg-badge wait" id="b1">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A <code>.sut</code> is a <strong>SQLite database</strong>. <code>Node</code> holds the brush name, <code>Variant</code> holds one column per setting, and <code>MaterialFile</code> holds the images. Image settings such as <code>BrushPatternImageArray</code> are lists of references to materials by path.</div><div class="log" id="o1"></div></div></div>
+
+      <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Decode Materials</span><span class="stg-badge wait" id="b2">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Each material is a <strong>tar archive</strong> whose <code>.layer</code> file is a "C2F" container around another SQLite database. Its first 5&nbsp;KiB are encrypted, so we walk the plaintext <strong>4096-byte pages</strong> directly. We then inflate the layer's <strong>256&times;256 zlib tiles</strong> (8-bit gray, 1-bit or BGRA). Tip shape comes from <strong>transparency</strong>, just as in CSP.</div>
+      <div class="tex-row" id="mats"></div><div class="log" id="o2"></div></div></div>
+
+      <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">Map Parameters</span><span class="stg-badge wait" id="b3">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Settings map onto Krita's <strong>Pixel brush</strong>:
+        <ul>
+          <li>Size, opacity and density map directly.</li>
+          <li>Spacing uses the fixed or narrow / normal / wide setting.</li>
+          <li>Effector curves become Pressure / Speed / Fuzzy sensors.</li>
+          <li>Rotation follows the stroke or is random.</li>
+          <li>Thickness maps to Ratio and spray to Scatter.</li>
+          <li>The paper texture becomes Krita's Texture option, and the dual brush becomes Krita's masking brush.</li>
+        </ul>
+        Watercolor, taper and color jitter have no Krita equivalent and are listed per brush.</div><div class="log" id="o3"></div></div></div>
+
+      <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Write Presets</span><span class="stg-badge wait" id="b4">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A <code>.kpp</code> preset is a <strong>PNG thumbnail</strong> with the preset XML in a text chunk. The thumbnails below are sample strokes drawn with the converted settings.</div>
+      <div class="brush-grid" id="cards"></div><div class="log" id="o4"></div></div></div>
+
+      <div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">Bundle</span><span class="stg-badge wait" id="b5">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A Krita <code>.bundle</code> is a zip. It holds an uncompressed <code>mimetype</code>, a manifest with an <strong>MD5 for every file</strong>, the presets, the tips (<code>brushes/</code>) and the textures (<code>patterns/</code>). The presets are tagged with the bundle name.</div><div class="log" id="o5"></div></div></div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { readSut } from '../../lib/csp/sut.js';
+    import { browserImaging, decodeImage, maskToCanvas } from '../../lib/image.js';
+    import { coverage, flattenGray } from '../../lib/pixels.js';
+    import { writeBundle } from '../../lib/krita/bundle.js';
+    import { kppBytes } from '../../lib/krita/kpp.js';
+    import { convertBrush, ResourcePool, slug } from '../../lib/krita/mapping.js';
+    import { renderNav } from '../../lib/nav.js';
+    import { badge, brushCard, detailsAction, download, escapeHtml, failRunning, formatSize, latestOnly, loadSql, log, progress, resetStages, setResult, setupDrop } from '../../lib/ui.js';
+
+    renderNav('csp', 'krita');
+
+    const STAGES = 5;
+    const MAX_PREVIEWS = 24;
+    // Last run, so settings can be re-applied without dropping the files again.
+    const state = { files: null, presets: null, resources: null, failed: 0, output: null };
+
+    function materialCard(mat, role) {
+      const card = document.createElement('div');
+      card.className = 'tex-card';
+      // Show what the converter uses: the tip shape as dark ink, the texture as flat gray.
+      const cv = role === 'texture' ? maskToCanvas(flattenGray(mat.image), 'gray') : maskToCanvas(coverage(mat.image));
+      const shown = document.createElement('canvas');
+      shown.width = cv.width; shown.height = cv.height;
+      shown.getContext('2d').drawImage(cv, 0, 0);
+      shown.className = `light${Math.max(cv.width, cv.height) < 160 ? ' px' : ''}`;
+      shown.setAttribute('role', 'img');
+      shown.setAttribute('aria-label', `${role} ${mat.name}`);
+      card.append(shown);
+      const lbl = document.createElement('div');
+      lbl.className = 'tex-lbl';
+      lbl.innerHTML = `<b>${escapeHtml(role)}</b> ${escapeHtml(mat.name)} · ${mat.image.width}×${mat.image.height}`;
+      card.append(lbl);
+      return card;
+    }
+
+    /** .zip brush packs: pull out the .sut files inside (any folder depth). */
+    async function expandZips(files) {
+      const out = [];
+      for (const f of files) {
+        if (!f.name.toLowerCase().endsWith('.zip')) { out.push(f); continue; }
+        const zip = await window.JSZip.loadAsync(await f.arrayBuffer());
+        const suts = Object.values(zip.files).filter((e) => !e.dir && /\.sut$/i.test(e.name) && !e.name.includes('__MACOSX'));
+        log(1, `${f.name}: ${suts.length} .sut file(s) inside`, suts.length ? 'd' : 'w');
+        for (const e of suts) out.push(new File([await e.async('uint8array')], e.name.split('/').pop()));
+      }
+      return out;
+    }
+
+    const bundleName = () => document.getElementById('optName').value.trim()
+      || (state.files && state.files.length === 1 ? state.files[0].name.replace(/\.(sut|zip)$/i, '') : 'CSP Brushes');
+
+    /** Stage 5, also re-run on its own when the bundle name or author changes. */
+    async function makeBundle() {
+      const name = bundleName();
+      const author = document.getElementById('optAuthor').value.trim();
+      badge(5, 'run');
+      document.getElementById('o5').replaceChildren();
+      for (const r of state.resources) log(5, `${r.kind}/${r.filename}  ${formatSize(r.data.length)}`, 'd');
+      const blob = await writeBundle(window.JSZip, state.presets, state.resources, {
+        name, author, tag: name,
+        description: `Converted from Clip Studio Paint with brush-converters (${state.presets.length} brushes)`,
+      });
+      state.output = { blob, filename: `${slug(name)}.bundle` };
+      log(5, `\n${state.output.filename}: ${state.presets.length} presets, ${state.resources.length} resources, ${formatSize(blob.size)}`, 'c');
+      badge(5, 'ok');
+      const warned = state.warned;
+      setResult({
+        state: 'ok',
+        title: `${state.presets.length} brush${state.presets.length === 1 ? '' : 'es'} → ${state.output.filename} (${formatSize(blob.size)})`,
+        detail: 'In Krita: Settings → Manage Resources → Import Resources. The presets are tagged with the bundle name.'
+          + (warned ? ` ${warned} brush${warned === 1 ? ' has' : 'es have'} settings Krita can't reproduce — see step 04.` : '')
+          + (state.failed ? ` ${state.failed} item(s) failed — see the steps below.` : ''),
+        actions: [{ label: 'Download .bundle', primary: true, onClick: () => download(state.output.blob, state.output.filename) }, detailsAction],
+      });
+    }
+
+    async function run(files) {
+      state.files = files;
+      state.output = null;
+      state.presets = null;
+      document.getElementById('mats').replaceChildren();
+      document.getElementById('cards').replaceChildren();
+      resetStages(STAGES, `Converting ${files.length} file${files.length === 1 ? '' : 's'}…`);
+      const maxTip = Number(document.getElementById('optTip').value);
+      try {
+        // 1. SQLite
+        badge(1, 'run');
+        log(1, 'Loading sql.js (WebAssembly)…', 'd');
+        const SQL = await loadSql();
+        const sources = await expandZips(files);
+        const read = [];
+        let failed = 0;
+        for (const file of sources) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const sig = new TextDecoder().decode(bytes.subarray(0, 15));
+          if (sig !== 'SQLite format 3') { log(1, `! ${file.name}: not a SQLite database`, 'r'); failed++; continue; }
+          read.push({ file, bytes });
+        }
+        log(1, `${read.length} file(s) readable${failed ? `, ${failed} skipped` : ''}`, read.length ? 'g' : 'r');
+        if (!read.length) throw new Error(sources.length ? 'none of the files is a CSP .sut (SQLite) file' : 'no .sut files found');
+        badge(1, 'ok');
+
+        // 2. Materials
+        badge(2, 'run');
+        const brushes = [];
+        const matsEl = document.getElementById('mats');
+        let previews = 0;
+        for (const [i, { file, bytes }] of read.entries()) {
+          progress(2, i + 1, read.length);
+          let found;
+          try {
+            found = await readSut(SQL, bytes, { fileName: file.name, decodePng: decodeImage });
+          } catch (e) {
+            log(2, `! ${file.name}: ${e.message}`, 'r');
+            failed++;
+            continue;
+          }
+          if (!found.length) { log(2, `! ${file.name}: no brushes found`, 'w'); continue; }
+          for (const b of found) {
+            const roles = [['tip', b.tips], ['texture', b.texture ? [b.texture] : []], ['dual tip', b.dualTips]];
+            const desc = roles.filter(([, m]) => m.length).map(([r, m]) => `${m.length} ${r}${m.length > 1 ? 's' : ''}`).join(', ');
+            log(2, `${b.name}  (${file.name})`, 'c');
+            log(2, `  ${desc || 'round tip, no images'}`, 'd');
+            for (const [role, mats] of roles) {
+              for (const m of mats) {
+                log(2, `  ${role} "${m.name}" ${m.image.width}×${m.image.height} from ${m.source}`, m.source === 'layer' ? 'g' : 'w');
+                if (previews++ < MAX_PREVIEWS) matsEl.append(materialCard(m, role));
+              }
+            }
+            brushes.push(b);
+          }
+        }
+        if (previews > MAX_PREVIEWS) log(2, `(showing the first ${MAX_PREVIEWS} of ${previews} images)`, 'd');
+        if (!brushes.length) throw new Error('no brushes could be read');
+        badge(2, 'ok');
+
+        // 3. Mapping
+        badge(3, 'run');
+        const pool = new ResourcePool();
+        const presets = [];
+        for (const [i, b] of brushes.entries()) {
+          progress(3, i + 1, brushes.length);
+          try {
+            const preset = await convertBrush(b, pool, browserImaging, maxTip);
+            presets.push(preset);
+            log(3, `ok ${preset.name}: ${preset.mapped.join(', ')}`, 'g');
+            for (const w of new Set(preset.warnings)) log(3, `   - ${w}`, 'w');
+          } catch (e) {
+            console.error(e);
+            log(3, `! ${b.name}: ${e.message}`, 'r');
+            failed++;
+          }
+        }
+        if (!presets.length) throw new Error('nothing could be converted');
+        log(3, `\n${presets.length} preset(s), ${pool.resources.length} tip/texture file(s)`, 'c');
+        badge(3, 'ok');
+
+        // 4. Presets
+        badge(4, 'run');
+        const written = [];
+        const used = new Set();
+        const cards = document.getElementById('cards');
+        for (const [i, preset] of presets.entries()) {
+          progress(4, i + 1, presets.length);
+          const { data, thumbnail } = await kppBytes(preset);
+          let filename = `${slug(preset.name)}.kpp`;
+          for (let n = 2; used.has(filename.toLowerCase()); n++) filename = `${slug(preset.name)}_${n}.kpp`;
+          used.add(filename.toLowerCase());
+          written.push({ filename, data, thumbnail });
+          cards.append(brushCard({ ...preset, filename, thumbnail }));
+          log(4, `paintoppresets/${filename}  ${formatSize(data.length)}`, 'd');
+        }
+        badge(4, 'ok');
+
+        // 5. Bundle
+        Object.assign(state, { presets: written, resources: pool.resources, failed, warned: presets.filter((p) => p.warnings.length).length });
+        await makeBundle();
+      } catch (e) {
+        state.presets = null;
+        failRunning(STAGES, e, 'Drop CSP sub tool files (.sut), a folder of them, or a .zip brush pack.');
+      }
+    }
+
+    const convert = latestOnly(run);
+    const rebundle = latestOnly(() => (state.presets ? makeBundle() : null));
+    setupDrop({ accept: ['.sut', '.zip'], onFiles: convert });
+    // Name / author only change the bundle; tip size needs a full re-run.
+    for (const id of ['optName', 'optAuthor']) {
+      document.getElementById(id).addEventListener('change', () => rebundle().catch((e) => failRunning(STAGES, e)));
+    }
+    document.getElementById('optTip').addEventListener('change', () => { if (state.files) convert(state.files); });
+  </script>
+</body>
+</html>

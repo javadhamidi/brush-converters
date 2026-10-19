@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Krita to Procreate Brush Converter</title>
+  <link rel="stylesheet" href="../../assets/fonts.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script src="../../vendor/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="to-procreate">
+  <div class="wrap">
+    <nav class="crumbs" id="nav" aria-label="Converters"><a class="home" href="../../">Brush Converters</a></nav>
+    <header>
+      <p class="kicker">Brush converter</p>
+      <h1><span class="c-krita">Krita</span><span class="to">→</span><span class="c-procreate">Procreate</span></h1>
+      <p class="subtitle">Turn a Krita bundle or presets into a Procreate brush set. Tips come across whether Krita generates them or loads them from an image, along with textures, pressure and speed curves, rotation, scatter and roundness.</p>
+    </header>
+
+    <div class="opts">
+      <label>Brush set name <input id="optName" placeholder="from the bundle" autocomplete="off"></label>
+    </div>
+
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a .bundle, .kpp presets or a .zip">
+      <div class="drop-title">Drop your Krita brushes here</div>
+      <div class="drop-hint">or click to choose. Loose <code>.kpp</code> presets can come with their tip and pattern files.</div>
+      <div class="drop-accepts"><span class="fmt krita"><code>.bundle</code></span><span class="fmt krita"><code>.kpp</code></span><span class="fmt krita"><code>.zip</code></span><span class="fmt krita">tips</span></div>
+      <div class="drop-file" id="dropFile"></div>
+      <input type="file" id="fi" accept=".bundle,.kpp,.zip,.png,.gbr,.gih,.svg,.pat" multiple>
+    </div>
+
+    <div class="pipeline-title"><h2>How it’s converted</h2><span>each step explains what it does</span></div>
+    <div class="pipeline">
+      <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">Read Presets</span><span class="stg-badge wait" id="b1">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A Krita <code>.bundle</code> is a ZIP of presets, tips and patterns. Each <code>.kpp</code> preset is a <strong>PNG</strong> whose <code>preset</code> text chunk (often <strong>zlib-compressed</strong>) holds the settings as XML. Filter, clone and other engines that edit pixels instead of painting are skipped.</div><div class="log" id="o1"></div></div></div>
+
+      <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Load Tips &amp; Textures</span><span class="stg-badge wait" id="b2">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Krita's <strong>generated</strong> tips (round, square, soft, gaussian) are drawn from their settings. <strong>Image</strong> tips are PNG or SVG files, and <strong>animated</strong> tips are GIMP <code>.gih</code> image hoses holding several images. Procreate paints with white, so every tip becomes a <strong>white-on-black</strong> <code>Shape.png</code>, and the texture becomes <code>Grain.png</code>.</div>
+      <div class="tex-row" id="mats"></div><div class="log" id="o2"></div></div></div>
+
+      <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">Map Settings</span><span class="stg-badge wait" id="b3">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Krita drives each option with <strong>sensor curves</strong>. A pressure curve becomes Procreate's pressure <strong>amount</strong>, taken from where the curve starts, and a speed curve becomes speed size. A drawing-angle sensor on rotation becomes "follow stroke", and a random sensor becomes rotation scatter. Ratio becomes roundness and Scatter becomes jitter. Sizes are estimates, since Procreate doesn't document its size unit.</div><div class="log" id="o3"></div></div></div>
+
+      <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Write Brushes</span><span class="stg-badge wait" id="b4">pending</span></div>
+      <div class="stg-body"><div class="stg-info">Each brush gets a <code>Brush.archive</code>, an NSKeyedArchiver <strong>binary plist</strong> with a <code>SilicaBrush</code> object, written using the same key names Procreate uses. The thumbnails below are sample strokes drawn with the converted settings.</div>
+      <div class="brush-grid" id="cards"></div><div class="log" id="o4"></div></div></div>
+
+      <div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">Package</span><span class="stg-badge wait" id="b5">pending</span></div>
+      <div class="stg-body"><div class="stg-info">A single brush becomes a <code>.brush</code> ZIP. Several become a <code>.brushset</code>: one folder per brush, named by its ID, and a <code>brushset.plist</code> listing them. Open either on your iPad (AirDrop or the Files app) to import it.</div><div class="log" id="o5"></div></div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { canvasToPng, decodeImage, decodeSvg, fitMask, maskToCanvas } from '../../lib/image.js';
+    import { renderStroke } from '../../lib/krita/kpp.js';
+    import { slug } from '../../lib/krita/preset.js';
+    import { readKritaFiles } from '../../lib/krita/read.js';
+    import { renderNav } from '../../lib/nav.js';
+    import { padSquare } from '../../lib/pixels.js';
+    import { grayPng } from '../../lib/png.js';
+    import { kritaToSettings } from '../../lib/procreate/from-krita.js';
+    import { archiveFromSettings } from '../../lib/procreate/settings.js';
+    import { uuid, writeBrush, writeBrushset } from '../../lib/procreate/write.js';
+    import { badge, brushCard, detailsAction, download, failRunning, formatSize, imageCard, latestOnly, log, progress, readFiles, resetStages, setResult, setupDrop } from '../../lib/ui.js';
+
+    renderNav('krita', 'procreate');
+    const STAGES = 5;
+    const MAX_PREVIEWS = 24;
+    const MAX_SHAPE = 2048;
+    const state = { brushes: null, output: null, bundle: null, failed: 0, warned: 0 };
+
+    /** Sample stroke for the thumbnail; the renderer wants a texture with dark = paint. */
+    function thumbnail(s, shape, grain) {
+      let pattern = null;
+      if (grain) {
+        const data = new Uint8ClampedArray(grain.width * grain.height * 4);
+        for (let i = 0; i < grain.data.length; i++) { const v = 255 - grain.data[i]; data.set([v, v, v, 255], i * 4); }
+        pattern = { width: grain.width, height: grain.height, data };
+      }
+      return renderStroke({
+        mask: fitMask(shape, 256, 'gray'), size: s.size, spacing: Math.max(s.spacing, 0.02), angle: s.angle,
+        sizeCurve: s.pressureSize ? [[0, 1 - s.pressureSize], [1, 1]] : null,
+        opacity: s.opacity, flow: s.flow, followLine: s.followStroke, randomRotation: s.randomRotation || s.rotationJitter > 0.3,
+        scatter: s.jitter, ratio: s.roundness, pattern, patternScale: s.grainScale,
+      });
+    }
+
+    const setName = () => document.getElementById('optName').value.trim() || state.bundle || 'Krita Brushes';
+
+    async function pack() {
+      badge(5, 'run');
+      document.getElementById('o5').replaceChildren();
+      const { brushes } = state;
+      let blob, filename;
+      if (brushes.length === 1) {
+        blob = await writeBrush(window.JSZip, brushes[0]);
+        filename = `${slug(brushes[0].params.name)}.brush`;
+      } else {
+        blob = await writeBrushset(window.JSZip, setName(), brushes);
+        filename = `${slug(setName())}.brushset`;
+      }
+      state.output = { blob, filename };
+      log(5, `${filename}: ${brushes.length} brush${brushes.length === 1 ? '' : 'es'}, ${formatSize(blob.size)}`, 'c');
+      badge(5, 'ok');
+      const { warned, failed } = state;
+      setResult({
+        state: 'ok',
+        title: `${brushes.length} brush${brushes.length === 1 ? '' : 'es'} → ${filename} (${formatSize(blob.size)})`,
+        detail: 'Open it on your iPad (AirDrop or the Files app) to import it into Procreate.'
+          + (warned ? ` ${warned} brush${warned === 1 ? ' has' : 'es have'} settings Procreate can't reproduce — see step 04.` : '')
+          + (failed ? ` ${failed} item(s) failed or were skipped — see the steps below.` : ''),
+        actions: [{ label: `Download ${filename.endsWith('.brush') ? '.brush' : '.brushset'}`, primary: true, onClick: () => download(state.output.blob, state.output.filename) }, detailsAction],
+      });
+    }
+
+    async function run(files) {
+      Object.assign(state, { brushes: null, output: null, bundle: null });
+      document.getElementById('mats').replaceChildren();
+      document.getElementById('cards').replaceChildren();
+      resetStages(STAGES, `Converting ${files.length} file${files.length === 1 ? '' : 's'}…`);
+      try {
+        // 1 + 2. Read presets, tips and textures (the reader does both).
+        badge(1, 'run');
+        const read = await readKritaFiles(window.JSZip, await readFiles(files), { decodeImage, decodeSvg }, (i, n) => progress(1, i, n));
+        let failed = read.errors.length + read.skipped.length;
+        state.bundle = read.name;
+        if (read.name) log(1, `Bundle: ${read.name}`, 'c');
+        for (const e of read.errors) log(1, `! ${e}`, 'r');
+        for (const s of read.skipped) log(1, `skipped ${s.name}: ${s.reason}`, 'w');
+        const engines = {};
+        for (const p of read.presets) engines[p.engine] = (engines[p.engine] || 0) + 1;
+        log(1, `${read.presets.length} preset(s): ${Object.entries(engines).map(([e, n]) => `${n} ${e}`).join(', ')}`, read.presets.length ? 'g' : 'r');
+        if (!read.presets.length) throw new Error(read.errors[0] || 'no Krita presets found in what was dropped');
+        badge(1, 'ok');
+
+        badge(2, 'run');
+        const mats = document.getElementById('mats');
+        let previews = 0;
+        for (const p of read.presets) {
+          log(2, `${p.name}: ${p.tipLabel}${p.texture ? `, texture '${p.texture.name}'` : ''}`, p.tips ? 'g' : 'd');
+          if (p.tips && previews++ < MAX_PREVIEWS) mats.append(imageCard(maskToCanvas(fitMask(p.tips.masks[0], 256)), 'tip', p.name));
+        }
+        if (previews > MAX_PREVIEWS) log(2, `(showing the first ${MAX_PREVIEWS} of ${previews} tips)`, 'd');
+        badge(2, 'ok');
+
+        // 3. Settings
+        badge(3, 'run');
+        const mapped = [];
+        for (const [i, p] of read.presets.entries()) {
+          progress(3, i + 1, read.presets.length);
+          try {
+            const r = kritaToSettings(p);
+            mapped.push({ preset: p, ...r });
+            log(3, `ok ${p.name}: ${Math.round(r.settings.size)} px, ${r.mapped.join(', ')}`, 'g');
+            if (read.presets.length <= 8) for (const [k, v, to] of r.rows) log(3, `   ${k} ${v} → ${to}`, 'd');
+            for (const w of r.warnings) log(3, `   - ${w}`, 'w');
+          } catch (e) {
+            console.error(e);
+            log(3, `! ${p.name}: ${e.message}`, 'r');
+            failed++;
+          }
+        }
+        if (!mapped.length) throw new Error('nothing could be converted');
+        badge(3, 'ok');
+
+        // 4. Brushes
+        badge(4, 'run');
+        const cards = document.getElementById('cards');
+        const brushes = [];
+        for (const [i, m] of mapped.entries()) {
+          progress(4, i + 1, mapped.length);
+          const shape = fitMask(padSquare(m.shape), MAX_SHAPE, 'gray');
+          const grain = m.grain ? fitMask(m.grain, MAX_SHAPE, 'gray') : null;
+          const thumb = thumbnail(m.settings, shape, grain);
+          const params = archiveFromSettings(m.settings, uuid());
+          const brush = { params, shapePng: await grayPng(shape), grainPng: grain ? await grayPng(grain) : null, thumbPng: await canvasToPng(thumb) };
+          brushes.push(brush);
+          if (i < 60) cards.append(brushCard({ name: m.settings.name, filename: `${m.preset.engine} · about ${Math.round(m.settings.size)} px`, thumbnail: thumb, mapped: m.mapped, warnings: m.warnings }));
+          log(4, `${m.settings.name}: Shape ${shape.width}×${shape.height}${grain ? `, Grain ${grain.width}×${grain.height}` : ''}`, 'd');
+        }
+        if (mapped.length > 60) log(4, `(showing the first 60 of ${mapped.length} brushes)`, 'd');
+        badge(4, 'ok');
+
+        Object.assign(state, { brushes, failed, warned: mapped.filter((m) => m.warnings.length).length });
+        await pack();
+      } catch (e) {
+        state.brushes = null;
+        failRunning(STAGES, e, 'Drop a Krita .bundle, .kpp presets (with their tip files), or a .zip of them.');
+      }
+    }
+
+    const convert = latestOnly(run);
+    setupDrop({ accept: ['.bundle', '.kpp', '.zip', '.png', '.gbr', '.gih', '.svg', '.pat'], onFiles: convert });
+    document.getElementById('optName').addEventListener('change', () => { if (state.brushes) latestOnly(pack)().catch((e) => failRunning(STAGES, e)); });
+  </script>
+</body>
+</html>

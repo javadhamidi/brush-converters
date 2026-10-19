@@ -4,690 +4,211 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSP to Procreate Brush Converter</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--void:#06050a;--deep:#0b0a12;--surf:#100f19;--raised:#161524;--card:#1c1a2c;--rule:#24213a;--t1:#d0cce0;--t2:#8b87a5;--t3:#5c586e;--coral:#ff6b8a;--coral-d:#ff6b8a28;--mint:#56cfb2;--mint-d:#56cfb228;--gold:#e8b84d;--gold-d:#e8b84d28;--lilac:#a78bfa;--lilac-d:#a78bfa28;--sky:#60a5fa;--mono:'JetBrains Mono',monospace;--serif:'Source Serif 4',Georgia,serif}
-    html{font-size:15px}
-    body{font-family:var(--mono);background:var(--void);color:var(--t2);line-height:1.55;min-height:100vh;-webkit-font-smoothing:antialiased}
-    body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px)}
-    .wrap{max-width:820px;margin:0 auto;padding:3rem 1.5rem 6rem}
-    header{margin-bottom:3rem}
-    h1{font-family:var(--serif);font-size:1.65rem;font-weight:600;color:var(--t1);line-height:1.3;margin-bottom:.75rem;letter-spacing:-.02em}
-    h1 em{font-style:normal;color:var(--coral)}
-    .subtitle{font-size:.78rem;color:var(--t3);line-height:1.7}
-    .subtitle code{color:var(--t2);background:var(--surf);padding:1px 5px;border-radius:3px;font-size:.72rem}
-    .drop{border:1.5px dashed var(--rule);border-radius:10px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all .25s;background:var(--deep);margin-bottom:2.5rem}
-    .drop:hover,.drop.over{border-color:var(--coral);background:var(--coral-d)}
-    .drop.loaded{border-color:var(--mint);border-style:solid}
-    .drop-icon{font-size:1.6rem;margin-bottom:.6rem;opacity:.5}
-    .drop-title{font-size:.82rem;color:var(--t1);margin-bottom:.25rem}
-    .drop-hint{font-size:.68rem;color:var(--t3)}
-    .drop-file{font-size:.72rem;color:var(--coral);margin-top:.6rem}
-    input[type=file]{display:none}
-    .stg{position:relative;padding:0 0 0 2rem;margin-left:.6rem;border-left:1.5px solid var(--rule)}
-    .stg:last-child{border-left-color:transparent}
-    .stg::before{content:'';position:absolute;left:-.45rem;top:0;width:.75rem;height:.75rem;border-radius:50%;border:1.5px solid var(--rule);background:var(--void);z-index:1;transition:all .3s}
-    .stg.run::before{border-color:var(--coral);background:var(--coral);box-shadow:0 0 10px var(--coral-d)}.stg.run{border-left-color:var(--coral)}
-    .stg.ok::before{border-color:var(--mint);background:var(--mint)}.stg.ok{border-left-color:var(--mint)}
-    .stg.err::before{border-color:#f43f5e;background:#f43f5e}
-    .stg-head{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.5rem;padding-top:.15rem}
-    .stg-n{font-size:.6rem;color:var(--t3);min-width:1.2rem}
-    .stg-name{font-size:.78rem;font-weight:600;color:var(--t1)}
-    .stg-badge{margin-left:auto;font-size:.58rem;padding:2px 7px;border-radius:3px;letter-spacing:.04em}
-    .stg-badge.wait{color:var(--t3);background:var(--surf)}
-    .stg-badge.run{color:var(--coral);background:var(--coral-d);animation:blink 1.2s ease infinite}
-    .stg-badge.ok{color:var(--mint);background:var(--mint-d)}
-    .stg-badge.err{color:#f43f5e;background:#f43f5e22}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
-    .stg-body{background:var(--surf);border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-bottom:1.2rem}
-    .stg-info{padding:.85rem 1rem;font-family:var(--serif);font-size:.8rem;color:var(--t3);line-height:1.7;border-bottom:1px solid var(--rule)}
-    .stg-info code{font-family:var(--mono);font-size:.68rem;color:var(--lilac);background:var(--deep);padding:1px 5px;border-radius:3px}
-    .stg-info strong{color:var(--t2);font-weight:500}
-    .log{padding:.75rem 1rem;font-size:.68rem;line-height:1.65;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--t2)}
-    .log:empty{display:none}
-    .log .g{color:var(--mint)}.log .c{color:var(--coral)}.log .w{color:var(--gold)}.log .r{color:#f43f5e}.log .d{color:var(--t3)}.log .l{color:var(--lilac)}
-    .tex-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;padding:.85rem 1rem}
-    .tex-card{background:var(--deep);border-radius:5px;overflow:hidden;border:1px solid var(--rule)}
-    .tex-card canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated;background:repeating-conic-gradient(var(--raised) 0% 25%,var(--surf) 0% 50%) 0 0/12px 12px}
-    .tex-lbl{padding:.4rem .6rem;font-size:.58rem;color:var(--t3);border-top:1px solid var(--rule)}
-    .tex-lbl b{color:var(--t2);font-weight:500}
-    .ptbl-wrap{max-height:300px;overflow-y:auto}
-    table.ptbl{width:100%;border-collapse:collapse;font-size:.65rem}
-    .ptbl th{text-align:left;padding:.4rem .6rem;color:var(--t3);border-bottom:1px solid var(--rule);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:.58rem;position:sticky;top:0;background:var(--surf);z-index:1}
-    .ptbl td{padding:.3rem .6rem;border-bottom:1px solid #ffffff04}
-    .ptbl td:nth-child(1){color:var(--t1)}.ptbl td:nth-child(2){color:var(--sky)}.ptbl td:nth-child(3){color:var(--coral)}
-    .ptbl .dir{color:var(--mint)}.ptbl .apx{color:var(--gold)}.ptbl .non{color:#f43f5e}.ptbl .unk{color:var(--t3)}
-    .dl{margin-top:1.5rem;padding:1.5rem;background:var(--surf);border:1px solid var(--rule);border-radius:10px;text-align:center;display:none}
-    .dl.show{display:block}
-    .dl-btn{font-family:var(--mono);font-size:.78rem;font-weight:600;padding:.75rem 2rem;border:none;border-radius:7px;background:var(--coral);color:var(--void);cursor:pointer;transition:all .2s;letter-spacing:.03em}
-    .dl-btn:hover{box-shadow:0 4px 24px var(--coral-d);transform:translateY(-1px)}
-    .dl-btn:disabled{opacity:.25;cursor:not-allowed;transform:none;box-shadow:none}
-    .dl-note{margin-top:.6rem;font-size:.62rem;color:var(--t3)}
-    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--deep)}::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
-  </style>
+  <link rel="stylesheet" href="../../assets/fonts.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script src="../../vendor/jszip/3.10.1/jszip.min.js"></script>
+  <script src="../../vendor/sql.js/1.8.0/sql-wasm.js"></script>
 </head>
-<body>
+<body class="to-procreate">
   <div class="wrap">
+    <nav class="crumbs" id="nav" aria-label="Converters"><a class="home" href="../../">Brush Converters</a></nav>
     <header>
-      <h1>Clip Studio Paint <em>&rarr;</em> Procreate<br>Brush Converter</h1>
-      <p class="subtitle">Reads <code>.sut</code> files (SQLite databases), extracts brush tips from TAR-packed BLOBs, reverse-maps parameters, then <strong>writes a binary plist from scratch</strong> (<code>bplist00</code> + NSKeyedArchive) and packages into a <code>.brush</code> ZIP. Everything client-side via sql.js + JSZip + a hand-rolled bplist serializer.</p>
+      <p class="kicker">Brush converter</p>
+      <h1><span class="c-csp">Clip Studio Paint</span><span class="to">→</span><span class="c-procreate">Procreate</span></h1>
+      <p class="subtitle">Turn a Clip Studio Paint sub tool into a Procreate <code>.brush</code>. You get the full-resolution tip and grain, plus size and opacity pressure with their minimums, spacing and orientation.</p>
     </header>
-    <div class="drop" id="drop">
-      <div class="drop-icon">&#9671;</div>
-      <div class="drop-title">Drop a .sut file</div>
-      <div class="drop-hint">Clip Studio Paint sub-tool files &mdash; they're SQLite databases</div>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a .sut file">
+      <div class="drop-title">Drop a Clip Studio brush here</div>
+      <div class="drop-hint">or click to choose a sub tool file</div>
+      <div class="drop-accepts"><span class="fmt csp"><code>.sut</code></span></div>
       <div class="drop-file" id="dropFile"></div>
       <input type="file" id="fi" accept=".sut">
     </div>
+    <div class="pipeline-title"><h2>How it’s converted</h2><span>each step explains what it does</span></div>
     <div class="pipeline">
       <div class="stg" id="s1"><div class="stg-head"><span class="stg-n">01</span><span class="stg-name">SQLite Parsing</span><span class="stg-badge wait" id="b1">pending</span></div>
-      <div class="stg-body"><div class="stg-info">A <code>.sut</code> is a <strong>SQLite 3 database</strong> with three core tables: <code>Node</code> (brush name + variant links), <code>Variant</code> (all parameters as typed columns &mdash; REAL, INTEGER, TEXT, BLOB), and <code>MaterialFile</code> (brush tip image packed as a <strong>TAR archive</strong> BLOB). We open it with <strong>sql.js</strong> (SQLite compiled to WebAssembly).</div><div class="log" id="o1"></div></div></div>
+      <div class="stg-body"><div class="stg-info">A <code>.sut</code> is a <strong>SQLite 3 database</strong>. <code>Node</code> holds the brush name and links to its settings. <code>Variant</code> holds every parameter as a typed column, with dynamics stored as binary "effector" blobs. <code>MaterialFile</code> holds the images. We open it with <strong>sql.js</strong>, which is SQLite compiled to WebAssembly.</div><div class="log" id="o1"></div></div></div>
 
       <div class="stg" id="s2"><div class="stg-head"><span class="stg-n">02</span><span class="stg-name">Material Extraction</span><span class="stg-badge wait" id="b2">pending</span></div>
-      <div class="stg-body"><div class="stg-info">The <code>MaterialFile.FileData</code> BLOB contains a <strong>POSIX TAR archive</strong> with the brush tip at <code>thumbnail/thumbnail.png</code>. We parse the TAR header (filename at offset 0, size at offset 124 as octal), or fall back to scanning for the <strong>PNG magic bytes</strong> (<code>89 50 4E 47</code>) and <code>IEND</code> marker.</div>
+      <div class="stg-body"><div class="stg-info">Each <code>MaterialFile</code> BLOB is a <strong>tar archive</strong>. Inside it, a <code>.layer</code> file wraps an encrypted-header SQLite database, and we decode its <strong>zlib pixel tiles</strong> at full resolution. CSP takes the tip shape from <strong>transparency</strong>. Procreate wants <strong>white = paint on black</strong>, so we draw the shape that way. Paper textures are flattened and inverted into <code>Grain.png</code>.</div>
       <div class="tex-row">
-        <div class="tex-card"><canvas id="cv_csp" width="200" height="200"></canvas><div class="tex-lbl"><b>CSP tip</b> (dark = opaque)</div></div>
-        <div class="tex-card"><canvas id="cv_pc" width="200" height="200"></canvas><div class="tex-lbl"><b>Procreate tip</b> (white = opaque)</div></div>
+        <div class="tex-card"><canvas id="cv_csp" width="200" height="200" class="light" role="img" aria-label="CSP tip"></canvas><div class="tex-lbl"><b>CSP tip</b> as decoded</div></div>
+        <div class="tex-card"><canvas id="cv_pc" width="200" height="200" role="img" aria-label="Procreate shape"></canvas><div class="tex-lbl"><b>Shape.png</b> white = paint</div></div>
+        <div class="tex-card"><canvas id="cv_grain" width="200" height="200" role="img" aria-label="Procreate grain"></canvas><div class="tex-lbl"><b>Grain.png</b> <span id="grainLbl">none</span></div></div>
       </div>
       <div class="log" id="o2"></div></div></div>
 
       <div class="stg" id="s3"><div class="stg-head"><span class="stg-n">03</span><span class="stg-name">Parameter Mapping</span><span class="stg-badge wait" id="b3">pending</span></div>
-      <div class="stg-body"><div class="stg-info">Reverse-maps CSP <code>Variant</code> columns to Procreate's <strong>SilicaBrush</strong> property keys. Emits <strong>both old-style</strong> (pre-5.0: <code>plotSpacing</code>, <code>dynamicsPressureSize</code>) <strong>and new-style</strong> (5.0+: <code>spacing</code>, <code>pressureSize</code>) key names for maximum compatibility. ~60% direct; ~25% approximate; ~15% no equivalent.</div>
+      <div class="stg-body"><div class="stg-info">Maps CSP <code>Variant</code> columns onto Procreate's <strong>SilicaBrush</strong> keys, the same names Procreate itself writes. Pressure settings come from the decoded effectors: size and opacity pressure with their <strong>minimums</strong>. Spacing uses CSP's fixed / narrow / normal / wide setting, and rotation follows the stroke or is random.</div>
       <div class="ptbl-wrap"><table class="ptbl"><thead><tr><th>CSP Column</th><th>Value</th><th>Procreate Key</th><th>Fidelity</th></tr></thead><tbody id="ptbody"></tbody></table></div>
       <div class="log" id="o3"></div></div></div>
 
       <div class="stg" id="s4"><div class="stg-head"><span class="stg-n">04</span><span class="stg-name">Binary Plist Serialization</span><span class="stg-badge wait" id="b4">pending</span></div>
-      <div class="stg-body"><div class="stg-info">The hardest step: we <strong>write a <code>bplist00</code> file from scratch</strong>. This means constructing the full <strong>NSKeyedArchive</strong> object graph (<code>$archiver</code>, <code>$version</code>, <code>$top</code>, <code>$objects</code>), then serialising every object &mdash; strings, floats, ints, bools, UIDs, arrays, dicts &mdash; with proper <strong>type nibbles</strong>, big-endian encoding, an offset table, and a 32-byte trailer. The root <code>SilicaBrush</code> class sits at <code>$objects[1]</code>.</div><div class="log" id="o4"></div></div></div>
+      <div class="stg-body"><div class="stg-info">We write a <code>bplist00</code> file from scratch. This means building the full <strong>NSKeyedArchive</strong> object graph (<code>$archiver</code>, <code>$version</code>, <code>$top</code>, <code>$objects</code>) and serialising every object with its <strong>type nibble</strong>. Numbers are big-endian, followed by an offset table and a 32-byte trailer. The root <code>SilicaBrush</code> object sits at <code>$objects[1]</code>.</div><div class="log" id="o4"></div></div></div>
 
       <div class="stg" id="s5"><div class="stg-head"><span class="stg-n">05</span><span class="stg-name">ZIP Packaging</span><span class="stg-badge wait" id="b5">pending</span></div>
-      <div class="stg-body"><div class="stg-info">Finally we assemble the <code>.brush</code> ZIP archive: <code>Brush.archive</code> (the binary plist), <code>Shape.png</code> (inverted brush tip, white = opaque), and a generated <code>QuickLook/Thumbnail.png</code>. The ZIP is renamed to <code>.brush</code> for Procreate import via AirDrop or Files.</div><div class="log" id="o5"></div></div></div>
-    </div>
-    <div class="dl" id="dlBox">
-      <button class="dl-btn" id="dlBtn" disabled>Download .brush</button>
-      <div class="dl-note" id="dlNote"></div>
+      <div class="stg-body"><div class="stg-info">The <code>.brush</code> ZIP holds four files:
+        <ul>
+          <li><code>Brush.archive</code>: the binary plist.</li>
+          <li><code>Shape.png</code>: the tip.</li>
+          <li><code>Grain.png</code>: the texture, if the brush has one.</li>
+          <li><code>QuickLook/Thumbnail.png</code>: a sample stroke.</li>
+        </ul>
+        Import it into Procreate via AirDrop or the Files app.</div><div class="log" id="o5"></div></div></div>
     </div>
   </div>
-  <script>
-/* ═══════════════════════════════════════════════════════════
-   BINARY PLIST WRITER — builds bplist00 from a JS value tree
-   This is the core of the converter: no library exists for
-   writing Apple binary plists in the browser.
-   ═══════════════════════════════════════════════════════════ */
-    class UID{constructor(v){this.uid=v}}
 
-    function writeBplist(rootValue){
-  // Phase 1: Flatten JS value tree into indexed object list
-      var objs=[],seen=new Map();
+  <script type="module">
+    import { coverage, flattenGray, isEmpty, padSquare } from '../../lib/pixels.js';
+    import { browserImaging, canvasToPng, decodeImage, maskToCanvas, resizeMask } from '../../lib/image.js';
+    import { readSut } from '../../lib/csp/sut.js';
+    import { isBytes } from '../../lib/bytes.js';
+    import { renderStroke } from '../../lib/krita/kpp.js';
+    import { renderNav } from '../../lib/nav.js';
+    import { grayPng } from '../../lib/png.js';
+    import { cspToSettings } from '../../lib/procreate/from-csp.js';
+    import { archiveFromSettings } from '../../lib/procreate/settings.js';
+    import { uuid, writeBrush } from '../../lib/procreate/write.js';
+    import { buildBrushArchive } from '../../lib/bplist.js';
+    import { badge, detailsAction, download, escapeHtml, failRunning, formatSize, latestOnly, loadSql, log, resetStages, setResult, setupDrop, showCanvas } from '../../lib/ui.js';
 
-      function intern(val){
-        if(val===null||val===undefined){var k0='N';if(seen.has(k0))return seen.get(k0);var i0=objs.length;objs.push({t:0});seen.set(k0,i0);return i0}
-        if(typeof val==='boolean'){var kb='B'+val;if(seen.has(kb))return seen.get(kb);var ib=objs.length;objs.push({t:1,v:val});seen.set(kb,ib);return ib}
-        if(val instanceof UID){var iu=objs.length;objs.push({t:8,v:val.uid});return iu}
-        if(val instanceof Uint8Array){var id=objs.length;objs.push({t:4,v:val});return id}
-        if(typeof val==='number'){
-          if(Number.isInteger(val)){var ki='I'+val;if(seen.has(ki))return seen.get(ki);var ii=objs.length;objs.push({t:2,v:val});seen.set(ki,ii);return ii}
-          var kf='F'+val;if(seen.has(kf))return seen.get(kf);var fi=objs.length;objs.push({t:3,v:val});seen.set(kf,fi);return fi
-        }
-        if(typeof val==='string'){var ks='S'+val;if(seen.has(ks))return seen.get(ks);var si=objs.length;objs.push({t:5,v:val});seen.set(ks,si);return si}
-        if(Array.isArray(val)){var ai=objs.length;objs.push(null);var refs=val.map(intern);objs[ai]={t:10,r:refs};return ai}
-        if(typeof val==='object'){var di=objs.length;objs.push(null);var ek=Object.keys(val),kr=ek.map(function(k){return intern(k)}),vr=ek.map(function(k){return intern(val[k])});objs[di]={t:13,k:kr,v:vr};return di}
-        return intern(null);
-      }
+    renderNav('csp', 'procreate');
+    const STAGES = 5;
+    const MAX_SHAPE = 2048;
 
-      var topIdx=intern(rootValue);
-      var N=objs.length;
-      var refSz=N<256?1:N<65536?2:4;
+    function row([csp, value, to, f]) {
+      const tr = document.createElement('tr');
+      const cls = f === 'image' ? 'dir' : f;
+      tr.innerHTML = [csp, value, to].map((c) => `<td>${escapeHtml(c)}</td>`).join('')
+        + `<td><span class="${cls}">${f === 'dir' ? 'direct' : f === 'apx' ? 'approx' : f === 'image' ? 'image' : 'none'}</span></td>`;
+      document.getElementById('ptbody').appendChild(tr);
+    }
 
-  // Phase 2: Encode each object to bytes
-      function encSz(typeNib,count){
-        if(count<15)return[typeNib<<4|count];
-        var a=[typeNib<<4|0x0F];
-        if(count<256){a.push(0x10,count)}
-          else if(count<65536){a.push(0x11,(count>>8)&0xFF,count&0xFF)}
-            else{a.push(0x12,(count>>24)&0xFF,(count>>16)&0xFF,(count>>8)&0xFF,count&0xFF)}
-          return a;
-        }
-        function beInt(val,sz){var a=[];for(var i=sz-1;i>=0;i--)a.push((val>>>(i*8))&0xFF);return a}
-        function beRef(val){return beInt(val,refSz)}
+    /** Tip shape for Procreate: white = paint on black, square, at most MAX_SHAPE px. */
+    async function shapeFrom(brush, warn) {
+      let mask = null;
+      for (const tip of brush.tips) {
+        const cov = coverage(tip.image);
+        if (!isEmpty(cov)) { mask = padSquare(cov); break; }
+      }
+      if (brush.tips.length > 1) warn(`brush has ${brush.tips.length} tips; Procreate gets the first`);
+      if (!mask) {
+        mask = browserImaging.circleMask((brush.params.BrushHardness ?? 100) / 100);
+        warn(brush.tips.length ? 'tip image is empty; using a round tip' : 'round tip (no image): generated from hardness');
+      }
+      if (mask.width > MAX_SHAPE) mask = resizeMask(mask, MAX_SHAPE);
+      return mask;
+    }
 
-        function encObj(o){
-          switch(o.t){
-      case 0:return[0x00]; // null
-      case 1:return[o.v?0x09:0x08]; // bool
-      case 2:{ // int
-        var v=o.v;
-        if(v>=0&&v<256)return[0x10,v&0xFF];
-        if(v>=-128&&v<128)return[0x10,v&0xFF];
-        if(v>=-32768&&v<32768)return[0x11].concat(beInt(v,2));
-        if(v>=-2147483648&&v<=2147483647)return[0x12].concat(beInt(v,4));
-        // 8-byte: handle via DataView
-        var buf=new ArrayBuffer(8),dv=new DataView(buf);
-        dv.setFloat64(0,v,false);// approximate large ints as float64 in 8-byte int slot
-        return[0x13].concat(Array.from(new Uint8Array(buf)));
+    let brushOut = null;
+
+    async function run([file]) {
+      brushOut = null;
+      document.getElementById('ptbody').replaceChildren();
+      document.getElementById('grainLbl').textContent = 'none';
+      for (const id of ['cv_csp', 'cv_pc', 'cv_grain']) {
+        const c = document.getElementById(id); c.getContext('2d').clearRect(0, 0, c.width, c.height);
       }
-      case 3:{ // float64
-        var buf2=new ArrayBuffer(8),dv2=new DataView(buf2);
-        dv2.setFloat64(0,o.v,false);
-        return[0x23].concat(Array.from(new Uint8Array(buf2)));
-      }
-      case 4:{ // data blob
-        var hdr=encSz(4,o.v.length);return hdr.concat(Array.from(o.v));
-      }
-      case 5:{ // string
-        var isAscii=true;for(var i=0;i<o.v.length;i++)if(o.v.charCodeAt(i)>127){isAscii=false;break}
-        if(isAscii){var hdr2=encSz(5,o.v.length);var bytes=[];for(var j=0;j<o.v.length;j++)bytes.push(o.v.charCodeAt(j));return hdr2.concat(bytes)}
-        else{var hdr3=encSz(6,o.v.length);var bytes2=[];for(var j2=0;j2<o.v.length;j2++){var c=o.v.charCodeAt(j2);bytes2.push((c>>8)&0xFF,c&0xFF)}return hdr3.concat(bytes2)}
-      }
-      case 8:{ // UID
-        var v2=o.v,sz=v2<256?1:v2<65536?2:4;
-        return[0x80|(sz-1)].concat(beInt(v2,sz));
-      }
-      case 10:{ // array
-        var hdr4=encSz(0x0A,o.r.length);var refs=[];o.r.forEach(function(r){refs=refs.concat(beRef(r))});return hdr4.concat(refs);
-      }
-      case 13:{ // dict
-        var hdr5=encSz(0x0D,o.k.length);var krs=[],vrs=[];
-        o.k.forEach(function(r){krs=krs.concat(beRef(r))});
-        o.v.forEach(function(r){vrs=vrs.concat(beRef(r))});
-        return hdr5.concat(krs,vrs);
+      resetStages(STAGES, `Converting ${file.name}…`);
+      try {
+        // 1. SQLite
+        badge(1, 'run');
+        log(1, `File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+        log(1, 'Loading sql.js (WebAssembly)…', 'd');
+        const SQL = await loadSql();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const sig = new TextDecoder().decode(bytes.subarray(0, 15));
+        log(1, `Signature: "${sig}"`, 'l');
+        if (sig !== 'SQLite format 3') throw new Error('Not a SQLite database — is this a valid .sut file?');
+        const brushes = await readSut(SQL, bytes, { fileName: file.name, decodePng: decodeImage });
+        if (!brushes.length) throw new Error('No brush (Node with a Variant) found in this file');
+        const brush = brushes[0];
+        const p = brush.params;
+        log(1, `Brush: "${brush.name}"`, 'c');
+        if (brushes.length > 1) log(1, `${brushes.length} brushes in this file; converting the first`, 'w');
+        const cols = Object.keys(p);
+        log(1, `Variant: ${cols.length} columns, ${cols.filter((c) => isBytes(p[c])).length} binary`, 'g');
+        badge(1, 'ok');
+
+        // 2. Materials
+        badge(2, 'run');
+        const extra = [];
+        const warn = (w) => { extra.push(w); log(2, `! ${w}`, 'w'); };
+        brush.warnings.forEach((w) => log(2, `! ${w}`, 'w'));
+        for (const t of brush.tips) log(2, `tip "${t.name}": ${t.image.width}×${t.image.height} from ${t.source}`, t.source === 'layer' ? 'g' : 'w');
+        if (brush.tips[0]) showCanvas('cv_csp', maskToCanvas(coverage(brush.tips[0].image)));
+        const shape = await shapeFrom(brush, warn);
+        const shapePng = await grayPng(shape);
+        showCanvas('cv_pc', maskToCanvas(shape, 'gray'));
+        log(2, `Shape.png: ${shape.width}×${shape.height}, ${(shapePng.length / 1024).toFixed(1)} KB`, 'g');
+        let grainPng = null;
+        if (brush.texture) {
+          const flat = flattenGray(brush.texture.image);
+          const inv = { ...flat, data: flat.data.map((v) => 255 - v) };
+          const k = MAX_SHAPE / Math.max(inv.width, inv.height);
+          const sized = k < 1 ? resizeMask(inv, Math.round(inv.width * k), Math.round(inv.height * k), 'gray') : inv;
+          grainPng = await grayPng(sized);
+          showCanvas('cv_grain', maskToCanvas(sized, 'gray'));
+          document.getElementById('grainLbl').textContent = brush.texture.name;
+          log(2, `Grain.png from texture "${brush.texture.name}": ${sized.width}×${sized.height}`, 'g');
+        } else log(2, 'No paper texture', 'd');
+        badge(2, 'ok');
+
+        // 3. Parameters
+        badge(3, 'run');
+        const { settings, warnings, rows, counts } = cspToSettings(brush);
+        settings.hasGrain = !!grainPng;
+        rows.forEach(row);
+        for (const w of warnings.slice(brush.warnings.length)) log(3, `! ${w}`, 'w');
+        const pc = archiveFromSettings(settings, uuid());
+        log(3, `Mapped: direct=${counts.dir} approx=${counts.apx} none=${counts.non} unmapped=${counts.unmapped}`, 'c');
+        log(3, `Procreate keys: ${Object.keys(pc).length}`, 'g');
+        badge(3, 'ok');
+        const allWarnings = [...new Set([...warnings, ...extra])];
+
+        // 4. Binary plist
+        badge(4, 'run');
+        log(4, 'Building NSKeyedArchive object graph…', 'l');
+        log(4, `  $objects[1] = SilicaBrush (${Object.keys(pc).length} keys + $class)`, 'd');
+        const archive = buildBrushArchive(pc);
+        const t = archive.length - 32;
+        log(4, `  offsetIntSize ${archive[t + 6]}, objectRefSize ${archive[t + 7]}`, 'd');
+        log(4, `  Brush.archive: ${archive.length} bytes`, 'g');
+        badge(4, 'ok');
+
+        // 5. ZIP
+        badge(5, 'run');
+        const thumb = renderStroke({
+          mask: shape.width > 256 ? resizeMask(shape, 256, 256, 'gray') : shape,
+          size: settings.size, spacing: Math.max(settings.spacing, 0.02), angle: settings.angle,
+          sizeCurve: settings.pressureSize ? [[0, 1 - settings.pressureSize], [1, 1]] : null,
+          opacity: settings.opacity, flow: settings.flow, followLine: settings.followStroke, randomRotation: settings.rotationJitter > 0.5,
+          scatter: 0, ratio: settings.roundness, pattern: null, patternScale: 1,
+        });
+        const blob = await writeBrush(window.JSZip, { params: pc, shapePng, grainPng, thumbPng: await canvasToPng(thumb) });
+        const filename = `${file.name.replace(/\.sut$/i, '')}.brush`;
+        brushOut = { blob, filename };
+        log(5, `${filename}: ${(blob.size / 1024).toFixed(1)} KB`, 'c');
+        log(5, `  Brush.archive + Shape.png${grainPng ? ' + Grain.png' : ''} + QuickLook/Thumbnail.png`, 'd');
+        if (allWarnings.length) log(5, `${allWarnings.length} warning(s) — see steps 02 and 03`, 'w');
+        badge(5, 'ok');
+        setResult({
+          state: 'ok',
+          title: `"${brush.name}" → ${filename} (${formatSize(blob.size)})`,
+          detail: 'Import into Procreate via AirDrop or the Files app.'
+            + (allWarnings.length ? ` ${allWarnings.length} setting(s) couldn't be carried over — see steps 02 and 03.` : ''),
+          actions: [{ label: 'Download .brush', primary: true, onClick: () => download(brushOut.blob, brushOut.filename) }, detailsAction],
+        });
+      } catch (e) {
+        failRunning(STAGES, e, 'Drop a Clip Studio Paint sub tool file (.sut).');
       }
     }
-    return[0x00];
-  }
 
-  var encoded=objs.map(encObj);
-
-  // Phase 3: Compute offsets and build file
-  var bodyStart=8; // after "bplist00"
-  var offsets=[],pos=bodyStart;
-  encoded.forEach(function(e){offsets.push(pos);pos+=e.length});
-  var otOff=pos; // offset table starts here
-
-  var maxOff=otOff;
-  var oiSz=maxOff<256?1:maxOff<65536?2:4;
-
-  // Build offset table
-  var otBytes=[];
-  offsets.forEach(function(off){
-    for(var i=oiSz-1;i>=0;i--)otBytes.push((off>>>(i*8))&0xFF);
-  });
-
-  // Build trailer (32 bytes)
-  var trailer=new Uint8Array(32);
-  trailer[6]=oiSz;
-  trailer[7]=refSz;
-  // numObjects at offset 8 (8 bytes BE) — use last 4 bytes
-  trailer[12]=(N>>>24)&0xFF;trailer[13]=(N>>>16)&0xFF;trailer[14]=(N>>>8)&0xFF;trailer[15]=N&0xFF;
-  // topObjectIndex at offset 16 (8 bytes BE)
-  trailer[20]=(topIdx>>>24)&0xFF;trailer[21]=(topIdx>>>16)&0xFF;trailer[22]=(topIdx>>>8)&0xFF;trailer[23]=topIdx&0xFF;
-  // offsetTableOffset at offset 24 (8 bytes BE)
-  trailer[28]=(otOff>>>24)&0xFF;trailer[29]=(otOff>>>16)&0xFF;trailer[30]=(otOff>>>8)&0xFF;trailer[31]=otOff&0xFF;
-
-  // Assemble
-  var total=8;encoded.forEach(function(e){total+=e.length});total+=otBytes.length+32;
-  var result=new Uint8Array(total);
-  var hdrBytes=new TextEncoder().encode('bplist00');
-  result.set(hdrBytes,0);
-  var wp=8;
-  encoded.forEach(function(e){result.set(e,wp);wp+=e.length});
-  result.set(otBytes,wp);wp+=otBytes.length;
-  result.set(trailer,wp);
-
-  return result;
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   NSKEYED ARCHIVE BUILDER — constructs SilicaBrush archive
-   ═══════════════════════════════════════════════════════════ */
-function buildBrushArchive(params){
-  // $objects array — index 0 = $null, 1 = SilicaBrush dict, 2 = class descriptor
-  // The SilicaBrush dict references class descriptor via UID
-
-  // Build the SilicaBrush property dict
-  var brush={"$class":new UID(2)};
-  var keys=Object.keys(params);
-  keys.forEach(function(k){brush[k]=params[k]});
-
-  // Class descriptor
-  var clsDesc={
-    "$classname":"SilicaBrush",
-    "$classes":["SilicaBrush","NSObject"]
-  };
-
-  var objectsArray=["$null",brush,clsDesc];
-
-  // Top-level NSKeyedArchive structure
-  var root={
-    "$archiver":"NSKeyedArchiver",
-    "$version":100000,
-    "$top":{"root":new UID(1)},
-    "$objects":objectsArray
-  };
-
-  return writeBplist(root);
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   TAR EXTRACTOR — finds PNG inside MaterialFile BLOB
-   ═══════════════════════════════════════════════════════════ */
-function extractPngFromTar(data){
-  // Method 1: Walk TAR headers properly (512-byte headers + padded data)
-  try{
-    var offset=0;
-    while(offset<data.length-512){
-      // Read entry name
-      var ne=0;while(ne<100&&data[offset+ne]!==0)ne++;
-      if(ne===0)break; // empty name = end of archive
-      var nameBytes=[];for(var i=0;i<ne;i++)nameBytes.push(data[offset+i]);
-      var name=String.fromCharCode.apply(null,nameBytes);
-      // Read size (octal at offset+124, 12 bytes)
-      var ss='';for(var i2=124;i2<136;i2++){var b=data[offset+i2];if(b>=0x30&&b<=0x37)ss+=String.fromCharCode(b)}
-      var size=ss?parseInt(ss,8):0;
-      var padded=Math.ceil(size/512)*512;
-      // Check if this is the thumbnail PNG
-      if(name.indexOf('thumbnail')!==-1&&name.indexOf('.png')!==-1&&size>0){
-        var pngStart=offset+512;
-        var result=new Uint8Array(size);
-        for(var k=0;k<size;k++)result[k]=data[pngStart+k];
-          return result;
-      }
-      // Check any .png entry
-      if(name.indexOf('.png')!==-1&&size>0&&size<data.length){
-        var pngStart2=offset+512;
-        var result2=new Uint8Array(size);
-        for(var k2=0;k2<size;k2++)result2[k2]=data[pngStart2+k2];
-        // Don't return immediately — prefer thumbnail if it exists later
-          var fallbackPng=result2;
-      }
-      offset+=512+padded;
-      if(offset<=512+padded-512)break; // safety
-    }
-    if(typeof fallbackPng!=='undefined')return fallbackPng;
-  }catch(ex){/* fall through to byte scan */}
-
-  // Method 2: Scan for LAST PNG signature (thumbnail is usually last)
-    var PNG_SIG=[0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A];
-    var IEND_SIG=[0x49,0x45,0x4E,0x44,0xAE,0x42,0x60,0x82];
-    var lastPng=null;
-    for(var s=0;s<data.length-8;s++){
-      var match=true;for(var j=0;j<8;j++)if(data[s+j]!==PNG_SIG[j]){match=false;break}
-      if(!match)continue;
-      for(var e=s+8;e<data.length-8;e++){
-        var em=true;for(var j2=0;j2<8;j2++)if(data[e+j2]!==IEND_SIG[j2]){em=false;break}
-        if(em){var chunk=new Uint8Array(e+8-s);for(var k3=0;k3<chunk.length;k3++)chunk[k3]=data[s+k3];lastPng=chunk;s=e+8;break}
-      }
-    }
-    return lastPng;
-  }
-
-
-/* ═══════════════════════════════════════════════════════════
-   PARAMETER REVERSE MAP — CSP column to Procreate key
-   ═══════════════════════════════════════════════════════════ */
-  var RMAP={
-    Gap:            {p:'spacing',     f:'dir', fn:function(v){return(v||10)/100}},
-    BrushSize:      {p:'paintSize',   f:'dir', fn:function(v){return v||20}},
-    BrushSizeMin:   {p:'minimumSize', f:'dir', fn:function(v,row){var bs=row.BrushSize||20;return bs>0?Math.min(1,(v||1)/bs):0.05}},
-    BrushSizeMax:   {p:'maximumSize', f:'dir', fn:function(v){return v||200}},
-    PaintOpacity:   {p:'paintOpacity',f:'dir', fn:function(v){return(v||100)/100}},
-    PaintOpacityMin:{p:'minimumOpacity',f:'dir',fn:function(v){return(v||0)/100}},
-    BrushDensity:   {p:'flow',        f:'apx', fn:function(v){return(v||100)/100}},
-    Stabilization:  {p:'streamline',  f:'apx', fn:function(v){return Math.min(1,(v||0)/50)}},
-    PostCorrection: {p:'stabilization',f:'apx',fn:function(v){return Math.min(1,(v||0)/100)}},
-    Direction:      {p:'shapeRotation',f:'dir',fn:function(v){return(v||0)/360}},
-    Thickness:      {p:'shapeRoundness',f:'dir',fn:function(v){return(v||100)/100}},
-    DirectionRange: {p:'shapeRandomizedRotation',f:'dir',fn:function(v){return(v||0)>0?1:0}},
-    FlipHorizontal: {p:'shapeFlipX',  f:'dir', fn:function(v){return v?true:false}},
-    FlipVertical:   {p:'shapeFlipY',  f:'dir', fn:function(v){return v?true:false}},
-    ColorStretch:   {p:'wetMixPull',  f:'apx', fn:function(v){return(v||0)/100}},
-    AmountOfPaint:  {p:'wetMixDilution',f:'apx',fn:function(v){return 1-(v||100)/100}},
-    TextureDensity: {p:'grainDepth',  f:'apx', fn:function(v){return(v||0)/100}},
-    TextureScale:   {p:'grainScale',  f:'apx', fn:function(v){return(v||100)/100}},
-    SprayDeviation: {p:'jitter',      f:'apx', fn:function(v){return(v||0)/100}},
-    ParticleDensity:{p:'shapeCount',  f:'apx', fn:function(v){return Math.max(1,v||1)}},
-    PaintBlendMode: {p:'blendMode',   f:'dir', fn:function(v){return v||0}},
-    Hardness:       {p:'shapeFiltering',f:'apx',fn:function(v){return(v||80)>50?2:1}},
-    StartingLength: {p:'taperSizeBegin',f:'apx',fn:function(v){return Math.min(1,(v||0)/100)}},
-    EndingLength:   {p:'taperSizeEnd',f:'apx', fn:function(v){return Math.min(1,(v||0)/100)}},
-    WatercolorEdge: {p:'wetEdges',    f:'apx', fn:function(v){return(v||0)/100}},
-  // ── Dynamics columns (old-style Procreate keys) ──
-    DynPressureSize:    {p:'dynamicsPressureSize',    f:'dir', fn:function(v){return v||0}},
-    DynPressureOpacity: {p:'dynamicsPressureOpacity',  f:'dir', fn:function(v){return v||0}},
-    DynSpeedSize:       {p:'dynamicsSpeedSize',        f:'dir', fn:function(v){return v||0}},
-    DynSpeedOpacity:    {p:'dynamicsSpeedOpacity',      f:'dir', fn:function(v){return v||0}},
-    DynFalloff:         {p:'dynamicsFalloff',          f:'dir', fn:function(v){return v||0}},
-    DynMix:             {p:'dynamicsMix',              f:'dir', fn:function(v){return v||0}},
-    DynGlaze:           {p:'dynamicsGlaze',            f:'dir', fn:function(v){return v?true:false}},
-    TaperSize:          {p:'taperSize',                f:'dir', fn:function(v){return v||1}},
-    TaperOpacity:       {p:'taperOpacity',              f:'dir', fn:function(v){return v||1}},
-    TexMovement:        {p:'textureMovement',          f:'dir', fn:function(v){return v||0}},
-    TexZoom:            {p:'textureZoom',              f:'dir', fn:function(v){return v||0}},
-    TexRotation:        {p:'textureRotation',          f:'dir', fn:function(v){return v||0}},
-    TexFilter:          {p:'textureFilter',            f:'dir', fn:function(v){return v?true:false}},
-    BrushSizeMinRatio:  {p:'minSize',                  f:'dir', fn:function(v){return v||0}},
-    BrushSizeMaxRatio:  {p:'maxSize',                  f:'dir', fn:function(v){return v||1}},
-    PaintOpacityMax:    {p:'maxOpacity',                f:'dir', fn:function(v){return(v||100)/100}},
-    Oriented:           {p:'oriented',                  f:'dir', fn:function(v){return v?true:false}},
-    Stamp:              {p:'stamp',                    f:'dir', fn:function(v){return v?true:false}},
-  // ── REAL CSP column names (from actual .sut exports) ──
-    BrushInterval:      {p:'spacing',          f:'dir', fn:function(v){return(v||10)/100}},
-    Opacity:            {p:'paintOpacity',      f:'dir', fn:function(v){return(v||100)/100}},
-    BrushFlow:          {p:'flow',              f:'apx', fn:function(v){return(v||100)/100}},
-    BrushThickness:     {p:'shapeRoundness',    f:'dir', fn:function(v){return(v||100)/100}},
-    BrushRotation:      {p:'shapeRotation',     f:'dir', fn:function(v){return(v||0)/360}},
-    BrushHardness:      {p:'dynamicsFalloff',   f:'apx', fn:function(v){return(v||100)/100}},
-    BrushRevision:      {p:'streamline',        f:'apx', fn:function(v){return Math.min(1,(v||0)/20)}},
-    CompositeMode:      {p:'blendMode',         f:'dir', fn:function(v){return v||0}},
-    BrushInLength:      {p:'taperStartLength',  f:'apx', fn:function(v){return Math.min(1,(v||0)/100)}},
-    BrushOutLength:     {p:'taperEndLength',    f:'apx', fn:function(v){return Math.min(1,(v||0)/100)}},
-    BrushInRatio:       {p:'taperSize',         f:'apx', fn:function(v){return(v||0)/100}},
-    BrushOutRatio:      {p:'taperOpacity',      f:'apx', fn:function(v){return(v||0)/100}},
-    BrushMixColor:      {p:'wetMixPull',        f:'apx', fn:function(v){return(v||0)/100}},
-    BrushMixAlpha:      {p:'wetMixDilution',    f:'apx', fn:function(v){return 1-(v||100)/100}},
-    BrushSprayDensity:  {p:'shapeCount',        f:'apx', fn:function(v){return v||1}},
-    BrushSpraySize:     {p:'shapeScatter',      f:'apx', fn:function(v){return(v||0)/100}},
-    AntiAlias:          {p:'shapeFiltering',    f:'apx', fn:function(v){return v||2}},
-    BrushUseSpray:      {p:'_useSpray',         f:'non', fn:function(v){return v}},
-    BrushSize:          {p:'paintSize',          f:'dir', fn:function(v){return v||20}},
-    BrushVerticalThicknes:{p:'shapeRoundness',  f:'dir', fn:function(v){return v?1:0.5}},
-  // ── CSP-only (no Procreate equivalent) ──
-    SprayingEffect: {p:'_spray',      f:'non', fn:function(v){return v}},
-    AntiAliasing:   {p:'_aa',         f:'non', fn:function(v){return v}},
-    BrushTipType:   {p:'_tipType',    f:'non', fn:function(v){return v}},
-    NodeName:       {p:'name',        f:'dir', fn:function(v){return v||'Converted Brush'}},
-    SourceName:     {p:'name',        f:'dir', fn:function(v){return v||'Converted Brush'}},
-  };
-
-
-/* ═══════════════════════════════════════════════════════════
-   UI HELPERS
-   ═══════════════════════════════════════════════════════════ */
-  function L(n,t,cls){var el=document.getElementById('o'+n),d=document.createElement('span');d.className=cls||'';d.textContent=t+'\n';el.appendChild(d);el.scrollTop=el.scrollHeight}
-  function B(n,s){var b=document.getElementById('b'+n);b.className='stg-badge '+s;b.textContent=s==='run'?'running':s==='ok'?'done':s==='err'?'error':'pending';document.getElementById('s'+n).className='stg'+(s==='run'?' run':s==='ok'?' ok':s==='err'?' err':'')}
-  function drawBlob(cid,bytes){var cv=document.getElementById(cid),ctx=cv.getContext('2d');var blob=new Blob([bytes],{type:'image/png'}),url=URL.createObjectURL(blob),img=new Image();return new Promise(function(ok,no){img.onload=function(){cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);URL.revokeObjectURL(url);ok()};img.onerror=function(){URL.revokeObjectURL(url);no(new Error('Failed to load brush tip image ('+bytes.length+' bytes) - PNG may be corrupt'))};img.src=url})}
-  function invertCv(src,dst){var sc=document.getElementById(src),dc=document.getElementById(dst),ctx=sc.getContext('2d'),w=sc.width,h=sc.height;dc.width=w;dc.height=h;var dctx=dc.getContext('2d'),id=ctx.getImageData(0,0,w,h),d=id.data;for(var i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}dctx.putImageData(id,0,0)}
-  function cvBlob(cid){return new Promise(function(ok){document.getElementById(cid).toBlob(function(b){ok(b)},'image/png')})}
-  function uuid(){if(crypto.randomUUID)return crypto.randomUUID();return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==='x'?r:r&0x3|0x8).toString(16)})}
-
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN PIPELINE
-   ═══════════════════════════════════════════════════════════ */
-  var brushOut=null;
-
-  async function run(file){
-    brushOut=null;document.getElementById('dlBox').classList.remove('show');
-    for(var i=1;i<=5;i++){B(i,'wait');document.getElementById('o'+i).innerHTML=''}
-      document.getElementById('ptbody').innerHTML='';
-
-    try{
-    // ── S1: SQLite ──
-      B(1,'run');
-      L(1,'File: '+file.name+' ('+(file.size/1024).toFixed(1)+' KB)');
-      L(1,'Loading sql.js (WebAssembly)...');
-      var SQL=await initSqlJs({locateFile:function(f){return'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/'+f}});
-      L(1,'sql.js ready','g');
-
-      var ab=await file.arrayBuffer();
-      var sig=String.fromCharCode.apply(null,new Uint8Array(ab.slice(0,15)));
-      L(1,'Signature: "'+sig+'"','l');
-      if(sig.indexOf('SQLite')===-1)throw new Error('Not a SQLite database — is this a valid .sut file?');
-
-      var db=new SQL.Database(new Uint8Array(ab));
-
-    // Read tables
-      var tables=db.exec("SELECT name FROM sqlite_master WHERE type='table'");
-      var tblNames=tables[0]?tables[0].values.map(function(r){return r[0]}):[];
-      L(1,'Tables: '+tblNames.join(', '),'g');
-
-    // Read Node
-      var nodeRes=db.exec("SELECT * FROM Node LIMIT 1");
-      var nodeCols=nodeRes[0]?nodeRes[0].columns:[];
-      var nodeRow=nodeRes[0]?nodeRes[0].values[0]:[];
-      var nodeObj={};nodeCols.forEach(function(c,i){nodeObj[c]=nodeRow[i]});
-      var brushName=nodeObj.NodeName||'Converted Brush';
-      L(1,'Brush: "'+brushName+'"','c');
-    // Handle both NodeVariantId and NodeVariantID (case varies across CSP versions)
-      var vid=nodeObj.NodeVariantId||nodeObj.NodeVariantID||1;
-      L(1,'NodeVariantID: '+vid,'d');
-
-    // Read Variant — try VariantID match first, then fall back to _PW_ID=1
-      var varRes=db.exec("SELECT * FROM Variant WHERE VariantID="+vid);
-      if(!varRes[0]||!varRes[0].values[0])varRes=db.exec("SELECT * FROM Variant WHERE _PW_ID=1");
-      if(!varRes[0]||!varRes[0].values[0])varRes=db.exec("SELECT * FROM Variant LIMIT 1");
-      var varCols=varRes[0]?varRes[0].columns:[];
-      var varRow=varRes[0]?varRes[0].values[0]:[];
-      var varObj={};varCols.forEach(function(c,i){varObj[c]=varRow[i]});
-      L(1,'Variant: '+varCols.length+' columns','g');
-
-    // Show non-null variant values
-      var paramCount=0;
-      varCols.forEach(function(c){if(varObj[c]!==null&&c!=='_PW_ID'&&c!=='VariantId'&&!(varObj[c] instanceof Uint8Array)){paramCount++;L(1,'  '+c+': '+varObj[c],'d')}});
-      L(1,'Scalar params: '+paramCount,'g');
-      B(1,'ok');
-
-    // ── S2: Material Extraction ──
-      B(2,'run');
-      var matRes=db.exec("SELECT FileData FROM MaterialFile LIMIT 1");
-      var pngBytes=null;
-      if(matRes[0]&&matRes[0].values[0]&&matRes[0].values[0][0]){
-        var blobData=matRes[0].values[0][0];
-      // Ensure we have a Uint8Array (sql.js WASM may return typed array from different realm)
-        if(!(blobData instanceof Uint8Array)&&blobData.buffer)blobData=new Uint8Array(blobData.buffer,blobData.byteOffset,blobData.byteLength);
-        L(2,'MaterialFile BLOB: '+blobData.length+' bytes');
-        pngBytes=extractPngFromTar(blobData);
-        if(pngBytes){
-          L(2,'PNG extracted: '+pngBytes.length+' bytes','g');
-          await drawBlob('cv_csp',pngBytes);
-          invertCv('cv_csp','cv_pc');
-          var dim=document.getElementById('cv_csp');
-          L(2,'Dimensions: '+dim.width+'x'+dim.height+'px');
-          L(2,'Inverted: dark=opaque -> white=opaque for Procreate','g');
-        }else{
-          L(2,'No PNG found in BLOB — generating fallback','w');
-        }
-      }else{
-        L(2,'No MaterialFile data — generating fallback circle','w');
-      }
-      if(!pngBytes){
-        var fc=document.getElementById('cv_csp');fc.width=fc.height=256;
-        var fx=fc.getContext('2d');fx.fillStyle='#fff';fx.fillRect(0,0,256,256);
-        fx.fillStyle='#000';fx.beginPath();fx.arc(128,128,112,0,Math.PI*2);fx.fill();
-        invertCv('cv_csp','cv_pc');
-      }
-      db.close();
-      B(2,'ok');
-
-    // ── S3: Parameter Mapping ──
-      B(3,'run');
-      var pcParams={};var nD=0,nA=0,nN=0,nU=0;
-      var tb=document.getElementById('ptbody');
-
-    // Helper: detect BLOBs across WASM boundary (instanceof Uint8Array can fail)
-      function isBlob(v){return v&&typeof v==='object'&&v.buffer instanceof ArrayBuffer&&typeof v.byteLength==='number'}
-
-    // Apply reverse map
-      varCols.forEach(function(col){
-        var val=varObj[col];
-        if(col==='_PW_ID'||col==='VariantId'||col==='VariantID'||col==='VariantShowSeparator')return;
-        if(val===null||val===undefined)return;
-        if(isBlob(val)){
-        // BLOB columns (Effectors) — log but skip
-          var tr=document.createElement('tr');
-          tr.innerHTML='<td>'+col+'</td><td>[BLOB '+val.byteLength+'B]</td><td>Effector (skipped)</td><td><span class="non">binary</span></td>';
-          tb.appendChild(tr);nN++;return;
-        }
-        var m=RMAP[col];
-        var tr2=document.createElement('tr');
-        if(m){
-          try{
-            var converted=m.fn(val,varObj);
-            if(m.p.charAt(0)!=='_')pcParams[m.p]=converted;
-            var fv=typeof val==='number'?val.toFixed(2):String(val);
-            var cv=typeof converted==='number'?converted.toFixed(4):(typeof converted==='boolean'?String(converted):String(converted));
-            tr2.innerHTML='<td>'+col+'</td><td>'+fv+'</td><td>'+m.p+' = '+cv+'</td><td><span class="'+m.f+'">'+m.f+'</span></td>';
-            if(m.f==='dir')nD++;else if(m.f==='apx')nA++;else nN++;
-          }catch(ex){tr2.innerHTML='<td>'+col+'</td><td>'+String(val).slice(0,20)+'</td><td>error: '+ex.message+'</td><td><span class="non">err</span></td>';nN++}
-        }else{
-          tr2.innerHTML='<td>'+col+'</td><td>'+(typeof val==='number'?val.toFixed(2):String(val))+'</td><td>-</td><td><span class="unk">unmapped</span></td>';
-          nU++;
-        }
-        tb.appendChild(tr2);
-      });
-
-    // Fill in essential defaults — emit BOTH old and new key names for compatibility
-    // New-style keys (Procreate 5.0+)
-      if(!pcParams.spacing)pcParams.spacing=pcParams.plotSpacing||0.1;
-      if(!pcParams.paintSize)pcParams.paintSize=20;
-      if(!pcParams.maximumSize)pcParams.maximumSize=pcParams.paintSize*2;
-      if(!pcParams.minimumSize)pcParams.minimumSize=pcParams.minSize||0.1;
-      if(!pcParams.paintOpacity)pcParams.paintOpacity=1;
-      if(!pcParams.minimumOpacity)pcParams.minimumOpacity=pcParams.minOpacity||0;
-      if(!pcParams.flow)pcParams.flow=1;
-      if(!pcParams.streamline)pcParams.streamline=0;
-      if(!pcParams.name)pcParams.name=brushName;
-      if(pcParams.shapeRotation===undefined)pcParams.shapeRotation=0;
-      if(pcParams.shapeRoundness===undefined)pcParams.shapeRoundness=1;
-      if(pcParams.jitter===undefined)pcParams.jitter=pcParams.plotJitter||0;
-      if(pcParams.grainDepth===undefined)pcParams.grainDepth=0;
-      if(pcParams.grainScale===undefined)pcParams.grainScale=pcParams.textureScale||1;
-      if(pcParams.blendMode===undefined)pcParams.blendMode=0;
-
-    // Old-style key aliases (pre-5.0 compatibility)
-      if(pcParams.plotSpacing===undefined)pcParams.plotSpacing=pcParams.spacing;
-      if(pcParams.plotJitter===undefined)pcParams.plotJitter=pcParams.jitter;
-      if(pcParams.minSize===undefined)pcParams.minSize=pcParams.minimumSize;
-      if(pcParams.maxSize===undefined)pcParams.maxSize=1;
-      if(pcParams.minOpacity===undefined)pcParams.minOpacity=pcParams.minimumOpacity;
-      if(pcParams.maxOpacity===undefined)pcParams.maxOpacity=1;
-      if(pcParams.textureScale===undefined)pcParams.textureScale=pcParams.grainScale;
-      if(pcParams.textureMovement===undefined)pcParams.textureMovement=pcParams.grainMoving?1:0;
-      if(pcParams.textureZoom===undefined)pcParams.textureZoom=pcParams.grainZoom?1:0;
-      if(pcParams.textureRotation===undefined)pcParams.textureRotation=0;
-      if(pcParams.textureFilter===undefined)pcParams.textureFilter=false;
-      if(pcParams.oriented===undefined)pcParams.oriented=false;
-      if(pcParams.stamp===undefined)pcParams.stamp=false;
-      if(pcParams.taperSize===undefined)pcParams.taperSize=0;
-      if(pcParams.taperOpacity===undefined)pcParams.taperOpacity=0;
-      if(pcParams.taperStartLength===undefined)pcParams.taperStartLength=0;
-      if(pcParams.taperEndLength===undefined)pcParams.taperEndLength=0;
-      if(pcParams.shapeScatter===undefined)pcParams.shapeScatter=0;
-      if(pcParams.shapeRandomise===undefined)pcParams.shapeRandomise=!!pcParams.shapeRandomizedRotation;
-      if(pcParams.dynamicsPressureSize===undefined)pcParams.dynamicsPressureSize=0;
-      if(pcParams.dynamicsPressureOpacity===undefined)pcParams.dynamicsPressureOpacity=1;
-      if(pcParams.dynamicsSpeedSize===undefined)pcParams.dynamicsSpeedSize=0;
-      if(pcParams.dynamicsSpeedOpacity===undefined)pcParams.dynamicsSpeedOpacity=1;
-      if(pcParams.dynamicsFalloff===undefined)pcParams.dynamicsFalloff=0;
-      if(pcParams.dynamicsMix===undefined)pcParams.dynamicsMix=0;
-      if(pcParams.dynamicsGlaze===undefined)pcParams.dynamicsGlaze=false;
-
-    // Add Procreate-required keys with defaults
-      pcParams.signedID=uuid();
-      pcParams.resetSignedID=uuid();
-      pcParams.version=1;
-      pcParams.brushBehavior=0;
-      pcParams.renderingMode=pcParams.renderingMode||1;
-      pcParams.pressureSize=pcParams.pressureSize||1;
-      pcParams.pressureOpacity=pcParams.pressureOpacity||0.5;
-      pcParams.shapeCount=pcParams.shapeCount||1;
-      pcParams.grainMoving=pcParams.grainMoving||false;
-      pcParams.grainZoom=pcParams.grainZoom||false;
-      pcParams.shapeFiltering=pcParams.shapeFiltering||2;
-      pcParams.previewStroke=true;
-      pcParams.orientToScreen=pcParams.oriented||false;
-      pcParams.luminanceBlending=false;
-      pcParams.colorBlending=false;
-      pcParams.wetMixCharge=pcParams.wetMixCharge||0;
-      pcParams.wetMixAttack=pcParams.wetMixAttack||0;
-      pcParams.wetMixGrade=pcParams.wetMixGrade||0;
-      pcParams.wetMixBlur=pcParams.wetMixBlur||0;
-
-      L(3,'Mapped: direct='+nD+' approx='+nA+' none='+nN+' unmapped='+nU,'c');
-      L(3,'Total Procreate params: '+Object.keys(pcParams).length,'g');
-      B(3,'ok');
-
-    // ── S4: Binary Plist ──
-      B(4,'run');
-      L(4,'Building NSKeyedArchive object graph...','l');
-      L(4,'  $objects[0] = "$null" (sentinel)','d');
-      L(4,'  $objects[1] = SilicaBrush dict ('+Object.keys(pcParams).length+' keys + $class)','d');
-      L(4,'  $objects[2] = class descriptor {$classname, $classes}','d');
-
-      var archiveBytes=buildBrushArchive(pcParams);
-      L(4,'\nbplist00 serialisation:','l');
-      L(4,'  Magic: "'+String.fromCharCode.apply(null,archiveBytes.slice(0,8))+'"','d');
-
-    // Read back trailer for verification
-      var trl=archiveBytes.length-32;
-      var oiSz2=archiveBytes[trl+6],orSz2=archiveBytes[trl+7];
-      var nObj2=(archiveBytes[trl+12]<<24|archiveBytes[trl+13]<<16|archiveBytes[trl+14]<<8|archiveBytes[trl+15])>>>0;
-      L(4,'  offsetIntSize: '+oiSz2+', objectRefSize: '+orSz2,'d');
-      L(4,'  numObjects: '+nObj2,'d');
-      L(4,'  Total: '+archiveBytes.length+' bytes','g');
-      B(4,'ok');
-
-    // ── S5: ZIP Package ──
-      B(5,'run');
-      L(5,'Building .brush ZIP archive...','l');
-      var zip=new JSZip();
-
-    // Brush.archive
-      zip.file('Brush.archive',archiveBytes);
-      L(5,'  Brush.archive: '+archiveBytes.length+' bytes','g');
-
-    // Shape.png (the inverted tip)
-      var shapeBlob=await cvBlob('cv_pc');
-      var shapeBuf=await shapeBlob.arrayBuffer();
-      zip.file('Shape.png',shapeBuf);
-      L(5,'  Shape.png: '+shapeBuf.byteLength+' bytes','g');
-
-    // Thumbnail (reuse shape as quicklook)
-      zip.file('QuickLook/Thumbnail.png',shapeBuf);
-      L(5,'  QuickLook/Thumbnail.png','d');
-
-    // Generate ZIP
-      var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-      brushOut=zipBlob;
-      L(5,'\n'+Array(48).join('='),'c');
-      L(5,'  .brush ready: '+(zipBlob.size/1024).toFixed(1)+' KB','c');
-      L(5,'  Contents: Brush.archive + Shape.png + QuickLook/','d');
-      L(5,Array(48).join('='),'c');
-      B(5,'ok');
-
-      document.getElementById('dlBox').classList.add('show');
-      document.getElementById('dlBtn').disabled=false;
-      document.getElementById('dlNote').textContent=brushName+'.brush — '+(zipBlob.size/1024).toFixed(1)+' KB — Import via AirDrop or Files app';
-
-    }catch(e){
-      var msg=e&&e.message?e.message:String(e);
-      for(var i2=1;i2<=5;i2++)if(document.getElementById('b'+i2).textContent==='running'){B(i2,'err');L(i2,'\n! '+msg,'r');if(e&&e.stack)L(i2,e.stack.split('\n').slice(1,3).join('\n'),'d');break}
-        console.error(e);
-    }
-  }
-
-
-/* ═══════════════════════════════════════════════════════════
-   EVENT WIRING
-   ═══════════════════════════════════════════════════════════ */
-  var dropEl=document.getElementById('drop'),fiEl=document.getElementById('fi'),dfEl=document.getElementById('dropFile');
-  dropEl.onclick=function(){fiEl.click()};
-  dropEl.ondragover=function(e){e.preventDefault();dropEl.classList.add('over')};
-  dropEl.ondragleave=function(){dropEl.classList.remove('over')};
-  dropEl.ondrop=function(e){e.preventDefault();dropEl.classList.remove('over');if(e.dataTransfer.files[0])go(e.dataTransfer.files[0])};
-  fiEl.onchange=function(e){if(e.target.files[0])go(e.target.files[0])};
-  function go(f){dropEl.classList.add('loaded');dfEl.textContent=f.name+' ('+(f.size/1024).toFixed(1)+' KB)';run(f)}
-  document.getElementById('dlBtn').onclick=function(){
-    if(!brushOut)return;
-    var a=document.createElement('a');
-    a.href=URL.createObjectURL(brushOut);
-    a.download=(dfEl.textContent.split(' (')[0]||'brush').replace(/\.sut$/i,'')+'.brush';
-    a.click();URL.revokeObjectURL(a.href);
-  };
-</script>
+    // One file at a time: extra files in a drop are ignored, so say so.
+    setupDrop({ accept: ['.sut'], onFiles: latestOnly(async (files) => {
+      await run(files);
+      if (files.length > 1 && brushOut) log(5, `(${files.length - 1} more file(s) dropped — this converter takes one at a time)`, 'w');
+    }) });
+  </script>
 </body>
 </html>
